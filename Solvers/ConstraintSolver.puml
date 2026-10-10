@@ -1,0 +1,13 @@
+@startuml
+
+[*] -> GetEquations
+GetEquations -down-> NeighborSolver
+
+NeighborSolver -down-> NeighborSolver : MadeChanges
+NeighborSolver -down-> SubSetSolver : MadeNoChanges
+SubSetSolver -up-> NeighborSolver : MadeChanges
+SubSetSolver -down-> EnumerationSolver : MadeNoChanges
+EnumerationSolver -up-> NeighborSolver : MadeChanges
+EnumerationSolver -down-> [*] : MadeNoChanges
+
+@enduml

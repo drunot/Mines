@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <!-- Compile the game's logic files directly, as the benchmark does.
+       Only Avalonia-free files can be listed here. -->
+  <ItemGroup>
+    <Compile Include="../Field.cs" Link="Mines/Field.cs" />
+    <Compile Include="../FieldMatrix.cs" Link="Mines/FieldMatrix.cs" />
+    <Compile Include="../Point.cs" Link="Mines/Point.cs" />
+    <Compile Include="../NeighborQuery.cs" Link="Mines/NeighborQuery.cs" />
+    <Compile Include="../Solvers/*.cs" LinkBase="Mines/Solvers" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" Version="6.0.4" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+</Project>

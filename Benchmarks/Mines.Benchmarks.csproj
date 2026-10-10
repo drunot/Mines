@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <Optimize>true</Optimize>
+  </PropertyGroup>
+
+  <!-- Compile the game's logic files directly, so every run measures the current code.
+       Only Avalonia-free files can be listed here. -->
+  <ItemGroup>
+    <Compile Include="../Field.cs" Link="Mines/Field.cs" />
+    <Compile Include="../FieldMatrix.cs" Link="Mines/FieldMatrix.cs" />
+    <Compile Include="../Point.cs" Link="Mines/Point.cs" />
+    <Compile Include="../NeighborQuery.cs" Link="Mines/NeighborQuery.cs" />
+    <Compile Include="../Solvers/*.cs" LinkBase="Mines/Solvers" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="BenchmarkDotNet" Version="0.15.8" />
+  </ItemGroup>
+</Project>
