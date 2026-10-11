@@ -1,9 +1,87 @@
 using System;
+using System.Linq;
+using Mines.Generators;
 
 namespace Mines;
 
+
+public interface IFieldOwner
+{
+    void OnRevealed(Field field);
+    void OnFlagChanged(bool flagged);
+}
 public class FieldMatrix
 {
+
+    class FieldOwnerHandler : IFieldOwner
+    {
+
+        public FieldOwnerHandler(FieldMatrix matrix)
+        {
+            _matrix = matrix;
+        }
+
+        public void OnRevealed(Field field)
+        {
+            _matrix._fields_left -= 1;
+            if (field.IsBomb)
+            {
+                _matrix._bombs_left -= 1;
+            }
+
+            if (!field.Hidden && !field.IsBomb && field.Number == null)
+            {
+                foreach (Field f in field.Neighbors)
+                {
+                    f.Hidden = false;
+                }
+                return;
+            }
+            if (field.IsBomb)
+            {
+                foreach (Field grid_field in _matrix.Fields)
+                {
+                    if (grid_field.IsBomb && !grid_field.Flagged)
+                    {
+                        grid_field.Hidden = false;
+                    }
+                }
+                _matrix._game_lost = true;
+            }
+            _matrix.FieldChanged?.Invoke(_matrix, EventArgs.Empty);
+        }
+
+        public void OnFlagChanged(bool flagged)
+        {
+
+            if (flagged == true)
+            {
+                _matrix._fields_left -= 1;
+                _matrix._bombs_left -= 1;
+            }
+            else
+            {
+                _matrix._fields_left += 1;
+                _matrix._bombs_left += 1;
+            }
+            _matrix.FieldChanged?.Invoke(_matrix, EventArgs.Empty);
+        }
+        private readonly FieldMatrix _matrix;
+
+    }
+
+    bool _game_lost = false;
+    public bool GameLost
+    {
+        get => _game_lost;
+    }
+
+    public bool GameWon
+    {
+        get => !_game_lost && _fields.Cast<Field>().All((Field f) => f.IsBomb || !f.Hidden);
+    }
+
+    // The part of FieldMatrix its fields may use. FieldMatrix gives it only to its own fields.
 
     private int _bombs_left;
     private int _fields_left;
@@ -17,7 +95,7 @@ public class FieldMatrix
     {
         get => _fields_left;
     }
-    public FieldMatrix(int rows, int columns, int bomb_count)
+    public FieldMatrix(int rows, int columns, int bomb_count, IMatrixGenerator generator)
     {
         _fields = new Field[rows, columns];
         _rows = rows;
@@ -25,35 +103,20 @@ public class FieldMatrix
 
         _bombs_left = bomb_count;
         _fields_left = _rows * _columns;
-
-
-        var rand = new Random();
-        Point<int>[] bombs = new Point<int>[bomb_count];
-
-        for (int i = 0; i < bomb_count; ++i)
-        {
-            var random_number = new Point<int>(rand.Next() % rows, rand.Next() % columns);
-            while (bombs.Contains(random_number))
-            {
-                random_number = new Point<int>(rand.Next() % rows, rand.Next() % columns);
-            }
-            bombs[i] = random_number;
-        }
+        _generator = generator;
 
         for (int r = 0; r < rows; r++)
         {
             for (int c = 0; c < columns; c++)
             {
-                bool is_bomb = bombs.Contains(new Point<int>(r, c));
-                _fields[r, c] = new Field(this, r, c, is_bomb);
-
-                _fields[r, c].FieldChanged += FieldChangedHandler;
+                _fields[r, c] = new Field(this, r, c, false, new FieldOwnerHandler(this));
             }
         }
     }
 
     public FieldMatrix(FieldMatrix source)
     {
+        _initialized = true;
         _rows = source.Rows;
         _columns = source.Columns;
         _fields = new Field[_rows, _columns];
@@ -62,8 +125,7 @@ public class FieldMatrix
         {
             for (int c = 0; c < _columns; c++)
             {
-                _fields[r, c] = new Field(this, r, c, source[r, c].IsBomb);
-                _fields[r, c].FieldChanged += FieldChangedHandler;
+                _fields[r, c] = new Field(this, r, c, source[r, c].IsBomb, new FieldOwnerHandler(this));
                 _bombs_left += source[r, c].IsBomb ? 1 : 0;
             }
         }
@@ -72,6 +134,7 @@ public class FieldMatrix
     // Board with bombs at chosen positions: bombs[row, column] is true for a bomb.
     public FieldMatrix(bool[,] bombs)
     {
+        _initialized = true;
         _rows = bombs.GetLength(0);
         _columns = bombs.GetLength(1);
         _fields = new Field[_rows, _columns];
@@ -81,54 +144,52 @@ public class FieldMatrix
         {
             for (int c = 0; c < _columns; c++)
             {
-                _fields[r, c] = new Field(this, r, c, bombs[r, c]);
-                _fields[r, c].FieldChanged += FieldChangedHandler;
+                _fields[r, c] = new Field(this, r, c, bombs[r, c], new FieldOwnerHandler(this));
                 _bombs_left += bombs[r, c] ? 1 : 0;
             }
         }
     }
 
-    private void FieldChangedHandler(Object? o, FieldChangedEventArgs e)
+    bool _initialized = false;
+
+    public void Initialize(Point<int> first_point)
     {
-        if (e.Flagged == true)
+        if (_initialized)
         {
-            _fields_left -= 1;
-            _bombs_left -= 1;
+            return;
         }
-
-        if (e.Flagged == false)
+        _initialized = true;
+        var bombs = _generator?.Generate(_rows, _columns, first_point, _bombs_left);
+        if (bombs is null)
         {
-            _fields_left += 1;
-            _bombs_left += 1;
+            return;
         }
-
-        if (e.Hidden == true)
+        for (int r = 0; r < _rows; ++r)
         {
-            // Stop handling events.
-            _fields_left += 1;
-            if (e.IsBomb)
+            for (int c = 0; c < _columns; ++c)
             {
-                _bombs_left += 1;
-            }
-
-        }
-        if (e.Hidden == false)
-        {
-            // Stop handling events.
-            _fields_left -= 1;
-            if (e.IsBomb)
-            {
-                _bombs_left -= 1;
+                _fields[r, c].IsBomb = bombs[r, c];
             }
         }
-        FieldChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    public bool SwapBombs(Point<int> point_a, Point<int> point_b)
+    {
+        if ((!_fields[point_a.X, point_a.Y].IsBomb && !_fields[point_b.X, point_b.Y].IsBomb) ||
+           (_fields[point_a.X, point_a.Y].IsBomb && _fields[point_b.X, point_b.Y].IsBomb))
+        {
+            return false;
+        }
+        _fields[point_a.X, point_a.Y].IsBomb = !_fields[point_a.X, point_a.Y].IsBomb;
+        _fields[point_b.X, point_b.Y].IsBomb = !_fields[point_b.X, point_b.Y].IsBomb;
+        return true;
     }
 
     public event EventHandler? FieldChanged;
 
     private Field[,] _fields;
 
-
+    private IMatrixGenerator? _generator;
     private int _rows;
     private int _columns;
 

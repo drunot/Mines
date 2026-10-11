@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   width="202.80916mm"
+   height="202.80916mm"
+   viewBox="0 0 202.80916 202.80916"
+   version="1.1"
+   id="svg1"
+   inkscape:version="1.4.4 (dcaf3e7d9e, 2026-05-05)"
+   sodipodi:docname="Question.Inkscape.svg"
+   inkscape:export-filename="Bomb.svg"
+   inkscape:export-xdpi="96"
+   inkscape:export-ydpi="96"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview1"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:document-units="mm"
+     inkscape:zoom="0.90772651"
+     inkscape:cx="490.78659"
+     inkscape:cy="470.95683"
+     inkscape:window-width="3072"
+     inkscape:window-height="1659"
+     inkscape:window-x="0"
+     inkscape:window-y="0"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="layer2" />
+  <defs
+     id="defs1" />
+  <g
+     inkscape:label="Layer 1"
+     inkscape:groupmode="layer"
+     id="layer1"
+     transform="translate(-3.5954208,-4.3282442)">
+    <path
+       style="font-weight:bold;font-size:224.335px;font-family:'GT Pressura';-inkscape-font-specification:'GT Pressura';fill:#333333;stroke-width:0"
+       d="m 124.51718,71.85813 c 0,5.159705 -3.81369,11.21675 -8.52473,15.70345 -4.71103,4.4867 -12.33842,8.300395 -17.273791,14.58178 -7.403056,9.6464 -6.281381,20.86315 -6.281381,27.81754 v 2.24335 c 0,2.46768 2.019016,4.4867 4.486701,4.4867 h 22.433501 c 2.46768,0 4.4867,-2.01902 4.4867,-4.4867 v -2.24335 c 0,-10.54375 1.79468,-14.35744 10.31941,-20.63882 9.87074,-7.17872 21.7605,-20.41449 21.7605,-39.034295 0,-26.471531 -20.86316,-45.315672 -47.33469,-45.315672 -26.022862,0 -47.559022,21.536161 -47.559022,48.007692 v 3.365025 c 0,2.467685 2.019015,4.4867 4.4867,4.4867 h 22.4335 c 2.467685,0 4.4867,-2.019015 4.4867,-4.4867 v -3.813695 c 0,-8.524731 6.057046,-16.376456 16.152122,-16.376456 8.9734,0 15.92778,6.057045 15.92778,15.703451 z"
+       id="text3"
+       aria-label="?"
+       sodipodi:nodetypes="sscsssssscssssssssss" />
+    <circle
+       style="fill:#333333;fill-opacity:1;stroke:none;stroke-width:0"
+       id="path3"
+       cx="108.14073"
+       cy="167.42484"
+       r="19.237623" />
+  </g>
+  <g
+     inkscape:groupmode="layer"
+     id="layer2"
+     inkscape:label="Layer 2"
+     style="display:none" />
+</svg>

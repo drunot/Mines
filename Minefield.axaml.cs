@@ -4,14 +4,14 @@ using Avalonia.Controls;
 using Avalonia.Layout;
 using Microsoft.VisualBasic;
 using Mines.Solving;
+using Mines.Generators;
 
 namespace Mines;
 
 public partial class Minefield : UserControl
 {
 
-    private ISolver _solver = new NeighborSolver();
-    private ISolver _solver2 = new ConstraintSolver();
+    private ISolver _solver = new ConstraintSolver();
     public static readonly StyledProperty<int> RowsProperty =
         AvaloniaProperty.Register<Minefield, int>(nameof(Rows), defaultValue: 9);
 
@@ -19,7 +19,7 @@ public partial class Minefield : UserControl
         AvaloniaProperty.Register<Minefield, int>(nameof(Columns), defaultValue: 9);
 
     public static readonly StyledProperty<int> BombCountProperty =
-        AvaloniaProperty.Register<Minefield, int>(nameof(BombCount), defaultValue: 20);
+        AvaloniaProperty.Register<Minefield, int>(nameof(BombCount), defaultValue: 75);
 
     public int Rows
     {
@@ -42,8 +42,8 @@ public partial class Minefield : UserControl
     public Minefield()
     {
         InitializeComponent();
-        _fieldMatrix = new FieldMatrix(Rows, Columns, BombCount);
-        _fieldMatrix2 = new FieldMatrix(_fieldMatrix);
+
+        _fieldMatrix = new FieldMatrix(Rows, Columns, BombCount, new DeterministicGenerator());
         BuildBoard();
         ResetButton.Click += (sender, e) =>
         {
@@ -65,63 +65,12 @@ public partial class Minefield : UserControl
             BuildBoard();
         }
     }
-    private bool _is_solving = false;
 
-    private void Solve(object? sender, EventArgs e)
-    {
-        if (_is_solving)
-        {
-            return;
-        }
-
-        _is_solving = true;
-        try
-        {
-            _solver.Solve(_fieldMatrix);
-        }
-        finally
-        {
-            _is_solving = false;
-        }
-    }
-    private bool _is_solving2 = false;
-
-    private void Solve2(object? sender, EventArgs e)
-    {
-        if (_is_solving2)
-        {
-            return;
-        }
-
-        _is_solving2 = true;
-        try
-        {
-            _solver2.Solve(_fieldMatrix2);
-        }
-        finally
-        {
-            _is_solving2 = false;
-        }
-    }
 
     private void BuildBoard()
     {
-        
-        if (_fieldMatrix is not null)
-        {
-            _fieldMatrix.FieldChanged -= Solve;
-        }
-        if (_fieldMatrix2 is not null)
-        {
-            _fieldMatrix2.FieldChanged -= Solve2;
-        }
-
-        _fieldMatrix = new FieldMatrix(Rows, Columns, BombCount);
-        _fieldMatrix.FieldChanged += Solve;
+        _fieldMatrix = new FieldMatrix(Rows, Columns, BombCount, new DeterministicGenerator());
         BuildBoard(BoardGrid, _fieldMatrix);
-        _fieldMatrix2 = new FieldMatrix(_fieldMatrix);
-        _fieldMatrix2.FieldChanged += Solve2;
-        BuildBoard(BoardGrid2, _fieldMatrix2);
     }
 
     private void BuildBoard(Grid boardGrid, FieldMatrix fieldMatrix)
@@ -183,5 +132,4 @@ public partial class Minefield : UserControl
     }
 
     private FieldMatrix _fieldMatrix;
-    private FieldMatrix _fieldMatrix2;
 }

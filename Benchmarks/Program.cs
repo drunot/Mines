@@ -1,7 +1,9 @@
-// Solver benchmark. Run from this folder:
-//   dotnet run -c Release                             all benchmarks
-//   dotnet run -c Release -- --filter '*Constraint*'  only matching benchmarks
-//   dotnet run -c Release -- check                    compare every solver with NeighborSolver
+// Solver and generator benchmarks. Run from this folder:
+//   dotnet run -c Release -- --filter '*'                  all benchmarks
+//   dotnet run -c Release -- --filter '*SolverBench*'      only the solvers
+//   dotnet run -c Release -- --filter '*GeneratorBench*'   only board generation (see GeneratorBench.cs)
+//   dotnet run -c Release -- check                         compare every solver with NeighborSolver
+//   dotnet run -c Release -- gencheck                      time board generation and validate every board
 //
 // Boards are generated from fixed seeds, so every run and every benchmark solves the same
 // boards and results stay comparable while optimizing. Correctness is covered by ../Tests.
@@ -127,7 +129,14 @@ public static class Program
             Check("100x100/2000", 200);
             return;
         }
-        BenchmarkRunner.Run<SolverBench>(args: args);
+        if (args.Length > 0 && args[0] == "gencheck")
+        {
+            GeneratorCheck.Run("9x16/20", 200, TimeSpan.FromSeconds(30));
+            GeneratorCheck.Run("16x30/99", 100, TimeSpan.FromSeconds(30));
+            GeneratorCheck.Run("100x100/2000", 10, TimeSpan.FromSeconds(120));
+            return;
+        }
+        BenchmarkSwitcher.FromTypes(new[] { typeof(SolverBench), typeof(GeneratorBench) }).Run(args);
     }
 
     // How each solver compares with NeighborSolver: same result, more found, wrong moves.

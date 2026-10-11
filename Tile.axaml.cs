@@ -6,6 +6,7 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 
 using System;
+using System.Linq;
 
 namespace Mines;
 
@@ -51,50 +52,68 @@ public partial class Tile : UserControl
     {
         if (Field is not null)
         {
+            Field.Parent.Initialize(Field.Position);
+            if (!Field.Hidden)
+            {
+                if(Field.Number == Field.Neighbors.Count((Field f) => f.Flagged))
+                {
+                    foreach(Field field in Field.Neighbors)
+                    {
+                        if (!field.Flagged)
+                        {
+                            field.Hidden = false;
+                        }
+                    }
+                }
+            }
             Field.Hidden = false;
         }
     }
+
+    bool questioned = false;
 
     private void OnTilePointerReleased(object? sender, PointerReleasedEventArgs e)
     {
         if (e.InitialPressMouseButton == MouseButton.Right && Field is not null)
         {
+            if (questioned)
+            {
+                questioned = false;
+                StyleButton();
+                return;
+            }
+
+            if (Field.Flagged)
+            {
+                questioned = true;
+            }
             Field.Flagged = !Field.Flagged;
         }
     }
 
+    // Shows the field's state by switching parts of the tile on and off; the tile's content stays the same.
     private void StyleButton()
     {
         if (Field is null)
         {
             return;
         }
-        if (Field.Flagged)
+
+        bool revealed = !Field.Hidden;
+        TileButton.Classes.Set("revealed", revealed);   // flat, no bevel
+        FlagIcon.IsVisible = Field.Flagged;
+        BombIcon.IsVisible = revealed && Field.IsBomb;
+
+        NumberText.IsVisible = revealed && Field.Number is not null;
+        if (NumberText.IsVisible)
         {
-            TileButton.Bind(BackgroundProperty, TileButton.GetResourceObservable("FlagBrush"));
-            return;
-        }
-        if (Field.Hidden)
-        {
-            TileButton.Bind(BackgroundProperty, TileButton.GetResourceObservable("HiddenBrush"));
-            return;
+            NumberText.Text = Field.Number.ToString();
+            NumberText.Bind(TextBlock.ForegroundProperty, NumberText.GetResourceObservable($"NumberBrush{Field.Number}"));
         }
 
-        if (Field.IsBomb)
-        {
-            TileButton.Bind(BackgroundProperty, TileButton.GetResourceObservable("BombBrush"));
-        }
-        else
-        {
-            TileButton.ClearValue(BackgroundProperty);
-        }
-
-        TileButton.Content = new TextBlock
-        {
-            Text = Field.Number.ToString(),
-            HorizontalAlignment = HorizontalAlignment.Center,
-            VerticalAlignment = VerticalAlignment.Center,
-        };
+        string background = !revealed ? "HiddenBrush" : Field.IsBomb ? "BombBrush" : "ClearBrush";
+        TileButton.Bind(BackgroundProperty, TileButton.GetResourceObservable(background));
+        QuestionIcon.IsVisible = !revealed && questioned;
     }
 
 }

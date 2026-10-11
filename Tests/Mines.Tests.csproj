@@ -13,6 +13,8 @@
     <Compile Include="../FieldMatrix.cs" Link="Mines/FieldMatrix.cs" />
     <Compile Include="../Point.cs" Link="Mines/Point.cs" />
     <Compile Include="../Solvers/*.cs" LinkBase="Mines/Solvers" />
+    <Compile Include="../Generators/*.cs" LinkBase="Mines/Generators" />
+    <Compile Include="../BoardFixer/*.cs" LinkBase="Mines/BoardFixer" />
   </ItemGroup>
 
   <ItemGroup>

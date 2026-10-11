@@ -3,12 +3,8 @@ using System.Linq;
 
 namespace Mines;
 
-
-
-
 public class FieldChangedEventArgs : EventArgs
 {
-
     public FieldChangedEventArgs(bool? flagged, bool? hidden, bool is_bomb)
     {
         Flagged = flagged;
@@ -19,18 +15,17 @@ public class FieldChangedEventArgs : EventArgs
     public readonly bool? Flagged;
     public readonly bool? Hidden;
     public readonly bool IsBomb;
-
 }
-
 
 public class Field
 {
-    public Field(FieldMatrix parent, int own_x, int own_y, bool is_bomb = false)
+    public Field(FieldMatrix parent, int own_x, int own_y, bool is_bomb = false, IFieldOwner? fieldOwner = null)
     {
         _pos = new Point<int>(own_x, own_y);
         _parent = parent;
-        _is_bomb = is_bomb;
+        IsBomb = is_bomb;
         _index = own_x * parent.Columns + own_y;
+        _fieldOwner = fieldOwner;
     }
 
     // A single number for this cell (row * Columns + column); the solver uses it instead of Position.
@@ -49,15 +44,13 @@ public class Field
     private Point<int> _pos;
 
 
-    public bool IsBomb { get => _is_bomb; }
-
-    private bool _is_bomb;
+    public bool IsBomb;
 
     public int? Number
     {
         get
         {
-            if (_is_bomb) return null;
+            if (IsBomb) return null;
 
             int bomb_count = this.Neighbors.Count((Field f) => f.IsBomb);
 
@@ -79,25 +72,8 @@ public class Field
                 return;
             }
             _hidden = value;
-            FieldChanged?.Invoke(this, new FieldChangedEventArgs(null, _hidden, _is_bomb));
-            if (!_hidden && !IsBomb && Number == null)
-            {
-                foreach (Field f in this.Neighbors)
-                {
-                    f.Hidden = false;
-                }
-                return;
-            }
-            if (IsBomb)
-            {
-                foreach (Field grid_field in _parent.Fields)
-                {
-                    if (grid_field.IsBomb && !grid_field.Flagged)
-                    {
-                        grid_field.Hidden = false;
-                    }
-                }
-            }
+            FieldChanged?.Invoke(this, new FieldChangedEventArgs(null, _hidden, IsBomb));
+            _fieldOwner?.OnRevealed(this);
         }
     }
 
@@ -113,7 +89,7 @@ public class Field
         {
             for (int y_cor = y_min; y_cor <= y_max; ++y_cor)
             {
-                if(x_cor == _pos.X && y_cor == _pos.Y)
+                if (x_cor == _pos.X && y_cor == _pos.Y)
                 {
                     continue;
                 }
@@ -140,11 +116,14 @@ public class Field
                 return;
             }
             _flagged = value;
-            FieldChanged?.Invoke(this, new FieldChangedEventArgs(_flagged, null, _is_bomb));
+            FieldChanged?.Invoke(this, new FieldChangedEventArgs(_flagged, null, IsBomb));
+            _fieldOwner?.OnFlagChanged(value);
         }
     }
 
     public Field[] Neighbors => _neighbors ??= ComputeNeighbors();
 
     private Field[]? _neighbors;
+
+    private IFieldOwner? _fieldOwner;
 }

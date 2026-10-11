@@ -2,24 +2,66 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Class="Mines.App"
              RequestedThemeVariant="Default">
-             <!-- "Default" ThemeVariant follows system theme variant. "Dark" or "Light" are other available options. -->
+    <!-- "Default" ThemeVariant follows system theme variant. "Dark" or "Light" are other available options. -->
     <Application.Resources>
         <ResourceDictionary>
             <ResourceDictionary.ThemeDictionaries>
                 <ResourceDictionary x:Key="Light">
                     <SolidColorBrush x:Key="BombBrush" Color="#D04040"/>
                     <SolidColorBrush x:Key="FlagBrush" Color="#52CB27"/>
-                    <SolidColorBrush x:Key="HiddenBrush" Color="#969696"/>
+                    <SolidColorBrush x:Key="HiddenBrush" Color="#CCCCCC"/>
+                    <SolidColorBrush x:Key="ClearBrush" Color="#999999"/>
+                    <SolidColorBrush x:Key="HoverBrush" Color="#777777"/>
+                    <Color x:Key="BevelLight">#FFFFFF</Color>
+                    <Color x:Key="BevelDark">#808080</Color>
+                    <Color x:Key="BevelLightHover">#AAAAAA</Color>
+                    <Color x:Key="BevelDarkHover">#606060</Color>
+                    <SolidColorBrush x:Key="NumberBrush1" Color="#2954FF"/>
+                    <SolidColorBrush x:Key="NumberBrush2" Color="#00913F"/>
+                    <SolidColorBrush x:Key="NumberBrush3" Color="#B01D00"/>
+                    <SolidColorBrush x:Key="NumberBrush4" Color="#005FA3"/>
+                    <SolidColorBrush x:Key="NumberBrush5" Color="#E03D50"/>
+                    <SolidColorBrush x:Key="NumberBrush6" Color="#00B38F"/>
+                    <SolidColorBrush x:Key="NumberBrush7" Color="Black"/>
+                    <SolidColorBrush x:Key="NumberBrush8" Color="#595959"/>
+                    <SolidColorBrush x:Key="FlagPoleBrush" Color="#333333"/>
+                    <SolidColorBrush x:Key="FlagClothBrush" Color="#FF3C00"/>
+                    <SolidColorBrush x:Key="BombIconBrush" Color="#333333"/>
+                    <SolidColorBrush x:Key="QuestionIconBrush" Color="#333333"/>
                 </ResourceDictionary>
                 <ResourceDictionary x:Key="Dark">
                     <SolidColorBrush x:Key="BombBrush" Color="#621414"/>
                     <SolidColorBrush x:Key="FlagBrush" Color="#296214"/>
                     <SolidColorBrush x:Key="HiddenBrush" Color="#757575"/>
+                    <SolidColorBrush x:Key="ClearBrush" Color="#303030"/>
+                    <SolidColorBrush x:Key="HoverBrush" Color="#202020"/>
+                    <Color x:Key="BevelLight">#AAAAAA</Color>
+                    <Color x:Key="BevelDark">#655665</Color>
+                    <Color x:Key="BevelLightHover">#808080</Color>
+                    <Color x:Key="BevelDarkHover">#101010</Color>
+                    <SolidColorBrush x:Key="NumberBrush1" Color="#2954FF"/>
+                    <SolidColorBrush x:Key="NumberBrush2" Color="#21D16D"/>
+                    <SolidColorBrush x:Key="NumberBrush3" Color="#EA4929"/>
+                    <SolidColorBrush x:Key="NumberBrush4" Color="#2887CA"/>
+                    <SolidColorBrush x:Key="NumberBrush5" Color="#E03D50"/>
+                    <SolidColorBrush x:Key="NumberBrush6" Color="#26DCB7"/>
+                    <SolidColorBrush x:Key="NumberBrush7" Color="White"/>
+                    <SolidColorBrush x:Key="NumberBrush8" Color="#B9B9B9"/>
+                    <SolidColorBrush x:Key="FlagPoleBrush" Color="#DDDDDD"/>
+                    <SolidColorBrush x:Key="FlagClothBrush" Color="#FF3C00"/>
+                    <SolidColorBrush x:Key="BombIconBrush" Color="#DDDDDD"/>
+                    <SolidColorBrush x:Key="QuestionIconBrush" Color="#DDDDDD"/>
                 </ResourceDictionary>
             </ResourceDictionary.ThemeDictionaries>
         </ResourceDictionary>
     </Application.Resources>
     <Application.Styles>
         <FluentTheme />
+        <Style Selector="Button:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource HoverBrush}"/>
+        </Style>
+        <Style Selector="Button /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource ClearBrush}"/>
+        </Style>
     </Application.Styles>
 </Application>
