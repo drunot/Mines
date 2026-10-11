@@ -11,6 +11,7 @@
         <Label VerticalAlignment="Center">Number of Bombs:</Label>
         <TextBox x:Name="BombTextBox"></TextBox>
         <Button Margin="5 0 0 0" x:Name="ResetButton">Reset</Button>
+        <Label x:Name="BombsLeftLabel" VerticalAlignment="Center"/>
       </DockPanel>
       <Grid x:Name="BoardGrid"/>
     </StackPanel>

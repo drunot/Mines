@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- The game logic: board, solvers, generators and the board fixer. No UI dependencies. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <RootNamespace>Mines</RootNamespace>
+  </PropertyGroup>
+
+  <!-- Tests and benchmarks may use internal types such as ISolver and NeighborSolver. -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="Mines.Tests" />
+    <InternalsVisibleTo Include="Mines.Benchmarks" />
+  </ItemGroup>
+</Project>

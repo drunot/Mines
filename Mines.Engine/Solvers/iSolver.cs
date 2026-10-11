@@ -2,7 +2,7 @@
 
 namespace Mines.Solving;
 
-interface ISolver
+public interface ISolver
 {
     
     void Solve(FieldMatrix fieldMatrix);

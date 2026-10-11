@@ -70,6 +70,7 @@ public partial class Minefield : UserControl
     private void BuildBoard()
     {
         _fieldMatrix = new FieldMatrix(Rows, Columns, BombCount, new DeterministicGenerator());
+        _fieldMatrix.FieldChanged += OnBoardChanged;
         BuildBoard(BoardGrid, _fieldMatrix);
     }
 
@@ -130,6 +131,10 @@ public partial class Minefield : UserControl
             }
         }
     }
+
+    private void OnBoardChanged(object? sender, EventArgs e) => UpdateBombsLeft();
+    private void UpdateBombsLeft() => BombsLeftLabel.Content = $"Bombs left: {_fieldMatrix.BombsLeft}";
+
 
     private FieldMatrix _fieldMatrix;
 }

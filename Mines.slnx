@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/Benchmarks/">
+    <Project Path="Benchmarks/Mines.Benchmarks.csproj" />
+  </Folder>
+  <Folder Name="/Tests/">
+    <Project Path="Tests/Mines.Tests.csproj" />
+  </Folder>
+  <Project Path="Mines.App/Mines.App.csproj" />
+  <Project Path="Mines.Engine/Mines.Engine.csproj" />
+</Solution>
