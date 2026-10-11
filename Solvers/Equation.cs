@@ -5,11 +5,10 @@ namespace Mines.Solving;
 
 public class Equation : IEquatable<Equation>
 {
-
-    public Equation()
+    public Equation(int capacity = 8)
     {
         sum = 0;
-        variables = new HashSet<Point<int>>();
+        variables = new HashSet<Point<int>>(capacity);
     }
 
     public Equation(Equation equation)
@@ -35,4 +34,18 @@ public class Equation : IEquatable<Equation>
 
     public static bool operator ==(Equation left, Equation right) => left.Equals(right);
     public static bool operator !=(Equation left, Equation right) => !left.Equals(right);
+
+
+    public readonly int Id = s_next_id++;
+    private static int s_next_id = 0;
+}
+
+// Next to Equation:
+public sealed class EquationIdentity : IEqualityComparer<Equation>
+{
+    public static readonly EquationIdentity Instance = new();
+
+    public bool Equals(Equation? x, Equation? y) => ReferenceEquals(x, y);
+
+    public int GetHashCode(Equation equation) => equation.Id;
 }

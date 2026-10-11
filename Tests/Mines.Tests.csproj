@@ -12,7 +12,6 @@
     <Compile Include="../Field.cs" Link="Mines/Field.cs" />
     <Compile Include="../FieldMatrix.cs" Link="Mines/FieldMatrix.cs" />
     <Compile Include="../Point.cs" Link="Mines/Point.cs" />
-    <Compile Include="../NeighborQuery.cs" Link="Mines/NeighborQuery.cs" />
     <Compile Include="../Solvers/*.cs" LinkBase="Mines/Solvers" />
   </ItemGroup>
 

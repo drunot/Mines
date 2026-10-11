@@ -4,41 +4,54 @@ using System.Linq;
 
 namespace Mines.Solving;
 
-abstract class SolvingStrategyBase: ISolvingStrategy
+abstract class SolvingStrategyBase : ISolvingStrategy
 {
 
     public abstract bool ApplyStrategy(FieldMatrix fieldMatrix, EquationList equations);
     protected static List<Equation> createEquations(FieldMatrix fieldMatrix, Point<int> location, HashSet<Point<int>> points)
     {
-
-        if (points.Contains(location) || fieldMatrix[location.X, location.Y].Hidden)
+        var equations = new List<Equation>();
+        var to_visit = new Stack<Point<int>>();
+        to_visit.Push(location);
+        while (to_visit.TryPop(out Point<int>? current))
         {
-            return new List<Equation>();
-        }
-        points.Add(location);
-        List<Equation> equations = new List<Equation>();
-        int number = 0;
-        var eq = fieldMatrix[location.X, location.Y].Neighbors.Aggregate(new Equation(), (Equation e, Field f) =>
+            Field field = fieldMatrix[current.X, current.Y];
+            if (field.Hidden || !points.Add(current))
             {
-                if (f.Hidden && !f.Flagged)
+                continue;
+            }
+
+            var equation = new Equation();
+            int number = 0;
+            foreach (Field neighbor in field.Neighbors)
+            {
+                if (neighbor.Hidden && !neighbor.Flagged)
                 {
-                    e.variables.Add(f.Position);
+                    equation.variables.Add(neighbor.Position);
                 }
-                if (f.IsBomb)
+                if (neighbor.IsBomb)
                 {
-                    e.sum += f.Flagged ? 0 : 1; // equals f.Number - Flagged, counted here to avoid a second pass.
-                    number += 1;  // equals f.Number, counted here to avoid a second pass.
+                    equation.sum += neighbor.Flagged ? 0 : 1;
+                    number += 1;
                 }
-                return e;
-            });
-        if (number != 0)
-        {
-            if (eq.variables.Count != 0) equations.Add(eq);
-            return equations;
+            }
+
+            if (number != 0)
+            {
+                if (equation.variables.Count != 0)
+                {
+                    equations.Add(equation);
+                }
+                continue;
+            }
+            foreach (Field neighbor in field.Neighbors)
+            {
+                to_visit.Push(neighbor.Position);
+            }
         }
-        fieldMatrix[location.X, location.Y].Neighbors.Aggregate(equations, (List<Equation> e, Field f) => { e.AddRange(createEquations(fieldMatrix, f.Position, points)); return e; });
         return equations;
     }
+
     protected void Flag(FieldMatrix fieldMatrix, EquationList equations, Point<int> point)
     {
         fieldMatrix[point.X, point.Y].Flagged = true;

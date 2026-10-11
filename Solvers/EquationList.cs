@@ -124,7 +124,7 @@ public class EquationList
             return;
         }
 
-        var candidates = new HashSet<Equation>(ReferenceEqualityComparer.Instance);
+        var candidates = new HashSet<Equation>(EquationIdentity.Instance);
         foreach (var variable in equation.variables)
         {
             candidates.UnionWith(_equation_record[variable.X, variable.Y]);
@@ -176,21 +176,21 @@ public class EquationList
         }
     }
 
-    private readonly HashSet<Equation> _equations = new(ReferenceEqualityComparer.Instance);
+    private readonly HashSet<Equation> _equations = new(EquationIdentity.Instance);
     private readonly List<Equation>[,] _equation_record;
     private readonly Queue<Equation>[] _pending = { new(), new(), new() };
     private readonly HashSet<Equation>[] _queued =
     {
-        new(ReferenceEqualityComparer.Instance),
-        new(ReferenceEqualityComparer.Instance),
-        new(ReferenceEqualityComparer.Instance),
+        new(EquationIdentity.Instance),
+        new(EquationIdentity.Instance),
+        new(EquationIdentity.Instance),
     };
 
     const int MaxCellsInGroup = 40; // Could be encased later.
 
     private HashSet<Equation> GetGroupFromEquation(Equation equation, out HashSet<Point<int>> cells)
     {
-        HashSet<Equation> equations = new HashSet<Equation>(ReferenceEqualityComparer.Instance);
+        HashSet<Equation> equations = new HashSet<Equation>(EquationIdentity.Instance);
         HashSet<Point<int>> local_cells = [.. equation.variables];
         var checked_points = new HashSet<Point<int>>();
         equations.Add(equation);

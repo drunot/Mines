@@ -95,6 +95,28 @@ public class Field
         }
     }
 
+    private Field[] ComputeNeighbors()
+    {
+        var x_min = Math.Max(_pos.X - 1, 0);
+        var x_max = Math.Min(_pos.X + 1, _parent.Rows - 1);
+        var y_min = Math.Max(_pos.Y - 1, 0);
+        var y_max = Math.Min(_pos.Y + 1, _parent.Columns - 1);
+        var result = new Field[(x_max - x_min + 1) * (y_max - y_min + 1) - 1];
+        int i = 0;
+        for (int x_cor = x_min; x_cor <= x_max; ++x_cor)
+        {
+            for (int y_cor = y_min; y_cor <= y_max; ++y_cor)
+            {
+                if(x_cor == _pos.X && y_cor == _pos.Y)
+                {
+                    continue;
+                }
+                result[i++] = _parent[x_cor, y_cor];
+            }
+        }
+        return result;
+    }
+
     private bool _hidden = true;
 
     public event EventHandler<FieldChangedEventArgs>? FieldChanged;
@@ -116,4 +138,7 @@ public class Field
         }
     }
 
+    public Field[] Neighbors => _neighbors ??= ComputeNeighbors();
+
+    private Field[]? _neighbors;
 }
