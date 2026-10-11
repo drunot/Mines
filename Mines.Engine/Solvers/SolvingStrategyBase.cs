@@ -4,13 +4,24 @@ using System.Linq;
 
 namespace Mines.Solving;
 
+/// <summary>
+/// Base class for the solving strategies, with helpers to flag and reveal cells while keeping the
+/// <see cref="EquationList"/> up to date.
+/// </summary>
 abstract class SolvingStrategyBase : ISolvingStrategy
 {
 
+    /// <inheritdoc/>
     public abstract bool ApplyStrategy(FieldMatrix fieldMatrix, EquationList equations);
 
-    // Equations for a revealed cell, and for every cell its cascade revealed: the walk continues
-    // through cells without neighbouring bombs. Visited cells are collected in `cells`.
+    /// <summary>
+    /// Equations for a revealed cell, and for every cell its cascade revealed: the walk continues
+    /// through cells without neighbouring bombs. Visited cells are collected in <paramref name="cells"/>.
+    /// </summary>
+    /// <param name="fieldMatrix">The board to read.</param>
+    /// <param name="location">The <see cref="Field.Index"/> of the revealed cell to start from.</param>
+    /// <param name="cells">Receives the revealed cells visited; cells already in it are skipped.</param>
+    /// <returns>The non-empty equations of the visited cells that have neighbouring bombs.</returns>
     protected static List<Equation> createEquations(FieldMatrix fieldMatrix, int location, HashSet<int> cells)
     {
         var equations = new List<Equation>();
@@ -55,12 +66,25 @@ abstract class SolvingStrategyBase : ISolvingStrategy
         return equations;
     }
 
+    /// <summary>
+    /// Flags <paramref name="cell"/> and removes it from the equations as a bomb.
+    /// </summary>
+    /// <param name="fieldMatrix">The board to change.</param>
+    /// <param name="equations">The equations to update.</param>
+    /// <param name="cell">The <see cref="Field.Index"/> of the cell.</param>
     protected void Flag(FieldMatrix fieldMatrix, EquationList equations, int cell)
     {
         fieldMatrix.FieldAt(cell).Flagged = true;
         equations.MarkBomb(cell);
     }
 
+    /// <summary>
+    /// Reveals <paramref name="cell"/> (if still hidden), adds the equations of it and of the cells its
+    /// cascade revealed, and removes all of them from the equations as safe.
+    /// </summary>
+    /// <param name="fieldMatrix">The board to change.</param>
+    /// <param name="equations">The equations to update.</param>
+    /// <param name="cell">The <see cref="Field.Index"/> of the cell.</param>
     protected void Reveal(FieldMatrix fieldMatrix, EquationList equations, int cell)
     {
         Field field = fieldMatrix.FieldAt(cell);

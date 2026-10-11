@@ -4,52 +4,84 @@ using System.Diagnostics.CodeAnalysis;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Threading;
-using Mines.Solving;
 using Mines.Generators;
 
 namespace Mines;
 
+/// <summary>
+/// The game: a toolbar with the bomb counter, the face (reset) button, the settings button with its popup and
+/// the timer, above the <see cref="Mines.BoardView"/>.
+/// </summary>
+/// <remarks>
+/// Builds a new board when the size or the settings change, and saves and loads the settings and an
+/// unfinished game through <see cref="SavedState"/>.
+/// </remarks>
 public partial class Minefield : UserControl
 {
 
-    private ISolver _solver = new ConstraintSolver();
+    /// <summary>
+    /// Defines the <see cref="Rows"/> property.
+    /// </summary>
     public static readonly StyledProperty<int> RowsProperty =
-        AvaloniaProperty.Register<Minefield, int>(nameof(Rows), defaultValue: 9);
+        AvaloniaProperty.Register<Minefield, int>(nameof(Rows), defaultValue: 15);
 
+    /// <summary>
+    /// Defines the <see cref="Columns"/> property.
+    /// </summary>
     public static readonly StyledProperty<int> ColumnsProperty =
-        AvaloniaProperty.Register<Minefield, int>(nameof(Columns), defaultValue: 9);
+        AvaloniaProperty.Register<Minefield, int>(nameof(Columns), defaultValue: 25);
 
+    /// <summary>
+    /// Defines the <see cref="BombCount"/> property.
+    /// </summary>
     public static readonly StyledProperty<int> BombCountProperty =
         AvaloniaProperty.Register<Minefield, int>(nameof(BombCount), defaultValue: 75);
 
+    /// <summary>
+    /// The number of rows of the board. Changing it starts a new game.
+    /// </summary>
     public int Rows
     {
         get => GetValue(RowsProperty);
         set => SetValue(RowsProperty, value);
     }
 
+    /// <summary>
+    /// The number of columns of the board. Changing it starts a new game.
+    /// </summary>
     public int Columns
     {
         get => GetValue(ColumnsProperty);
         set => SetValue(ColumnsProperty, value);
     }
 
+    /// <summary>
+    /// The number of bombs on new boards. Takes effect with the next new game.
+    /// </summary>
     public int BombCount
     {
         get => GetValue(BombCountProperty);
         set => SetValue(BombCountProperty, value);
     }
 
+    /// <summary>
+    /// Defines the <see cref="Generator"/> property.
+    /// </summary>
     public static readonly StyledProperty<GeneratorKind> GeneratorProperty =
         AvaloniaProperty.Register<Minefield, GeneratorKind>(nameof(Generator), defaultValue: GeneratorKind.NoGuessing);
 
-    // Which generator makes new boards.
+    /// <summary>
+    /// Which generator makes new boards.
+    /// </summary>
     public GeneratorKind Generator
     {
         get => GetValue(GeneratorProperty);
         set => SetValue(GeneratorProperty, value);
     }
 
+    /// <summary>
+    /// Creates the control, builds the first board and wires up the toolbar and the settings popup.
+    /// </summary>
     public Minefield()
     {
         InitializeComponent();
@@ -79,6 +111,11 @@ public partial class Minefield : UserControl
         };
     }
 
+    /// <summary>
+    /// Builds a new board when <see cref="Rows"/> or <see cref="Columns"/> changes, except while several
+    /// settings are being applied at once.
+    /// </summary>
+    /// <param name="change">The property change.</param>
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {
         base.OnPropertyChanged(change);
@@ -90,7 +127,13 @@ public partial class Minefield : UserControl
     }
 
 
-    // A new game: a fresh board, shown by the board view.
+    /// <summary>
+    /// A new game: a fresh board, shown by the board view.
+    /// </summary>
+    /// <remarks>
+    /// Uses the generator chosen by <see cref="Generator"/>, unlocks the board and resets the timer,
+    /// the bomb counter and the face.
+    /// </remarks>
     [MemberNotNull(nameof(_fieldMatrix))]
     private void BuildBoard()
     {
@@ -110,6 +153,12 @@ public partial class Minefield : UserControl
         UpdateFace();
     }
 
+    /// <summary>
+    /// Handles a change of a cell on the board: updates the bomb counter, starts the clock on the first
+    /// reveal and schedules a face update.
+    /// </summary>
+    /// <param name="sender">The board.</param>
+    /// <param name="e">The event data.</param>
     private void OnBoardChanged(object? sender, EventArgs e)
     {
         UpdateBombsLeft();
@@ -133,11 +182,22 @@ public partial class Minefield : UserControl
         }
     }
 
+    /// <summary>
+    /// True while a face update has been posted to the dispatcher but has not run yet.
+    /// </summary>
     private bool _face_update_pending;
+    /// <summary>
+    /// True while several settings are being changed together, so that only one new board is built.
+    /// </summary>
     private bool _applying_settings;
 
-    // Dead if lost, sunglasses if won, excited while a button is held down on the board, otherwise normal.
-    // A lost or won game also stops the clock and locks the board; a won game flags the remaining bombs.
+    /// <summary>
+    /// Updates the face on the reset button and handles the end of a game.
+    /// </summary>
+    /// <remarks>
+    /// Dead if lost, sunglasses if won, excited while a button is held down on the board, otherwise normal.
+    /// A lost or won game also stops the clock and locks the board; a won game flags the remaining bombs.
+    /// </remarks>
     private void UpdateFace()
     {
         bool lost = _fieldMatrix.GameLost;
@@ -172,14 +232,26 @@ public partial class Minefield : UserControl
 
     // ---- Time: starts on the first reveal, stops when the game is lost or won, resets with the board ----
 
+    /// <summary>
+    /// Measures the playing time of the current game (since this run of the app).
+    /// </summary>
     private readonly Stopwatch _clock = new();
     private readonly DispatcherTimer _timer = new() { Interval = TimeSpan.FromMilliseconds(200) };   // refreshes the display
+    /// <summary>
+    /// True once the game is lost or won: the time is final and the clock must not start again until the next game.
+    /// </summary>
     private bool _time_final;
 
     private TimeSpan _time_before;   // time from before a restart, when an unfinished game is continued
 
+    /// <summary>
+    /// The total playing time of the current game, including time from before a restart.
+    /// </summary>
     private TimeSpan Elapsed => _time_before + _clock.Elapsed;
 
+    /// <summary>
+    /// Stops and clears the clock for a new game and shows zero.
+    /// </summary>
     private void ResetTimer()
     {
         _clock.Reset();
@@ -189,11 +261,16 @@ public partial class Minefield : UserControl
         ShowTime();
     }
 
+    /// <summary>
+    /// Shows the elapsed time, in whole seconds, on the time counter.
+    /// </summary>
     private void ShowTime() => TimeCounter.Value = (int)Math.Min(int.MaxValue, Elapsed.TotalSeconds);
 
     // ---- Saving and loading (SavedState): the settings, and the board if a game was left unfinished ----
 
-    // Saves the settings, and the board only if the game was started and is neither lost nor won.
+    /// <summary>
+    /// Saves the settings, and the board only if the game was started and is neither lost nor won.
+    /// </summary>
     public void SaveState()
     {
         bool unfinished = _fieldMatrix.Initialized && !_fieldMatrix.GameLost && !_fieldMatrix.GameWon;
@@ -204,8 +281,13 @@ public partial class Minefield : UserControl
         }.Save();
     }
 
-    // Loads the saved settings and continues a saved unfinished game (timer included). Without a save file,
-    // the current settings and board stay.
+    /// <summary>
+    /// Loads the saved settings and continues a saved unfinished game (timer included).
+    /// </summary>
+    /// <remarks>
+    /// Without a save file, the current settings and board stay. With settings but no valid saved game,
+    /// a new board is built.
+    /// </remarks>
     public void LoadState()
     {
         SavedState? state = SavedState.Load();
@@ -230,6 +312,10 @@ public partial class Minefield : UserControl
         }
     }
 
+    /// <summary>
+    /// Replaces the current board with a saved unfinished game and keeps its clock running from the saved time.
+    /// </summary>
+    /// <param name="game">The saved game; it should have passed <see cref="SavedGame.IsValid"/>.</param>
     private void ContinueGame(SavedGame game)
     {
         _fieldMatrix.FieldChanged -= OnBoardChanged;
@@ -247,8 +333,14 @@ public partial class Minefield : UserControl
         UpdateBombsLeft();
         UpdateFace();
     }
+    /// <summary>
+    /// Shows the number of bombs left (bombs minus flags) on the bomb counter.
+    /// </summary>
     private void UpdateBombsLeft() => BombsLeftCounter.Value = _fieldMatrix.BombsLeft;
 
 
+    /// <summary>
+    /// The board of the current game.
+    /// </summary>
     private FieldMatrix _fieldMatrix;
 }

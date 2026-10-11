@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <!-- The game logic: board, solvers, generators and the board fixer. No UI dependencies. -->
   <PropertyGroup>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <RootNamespace>Mines</RootNamespace>

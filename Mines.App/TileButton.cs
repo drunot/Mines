@@ -6,13 +6,24 @@ using Avalonia.Media;
 
 namespace Mines;
 
-// A button drawn like a board cell: a raised tile with the cells' hover and press look. Subclasses draw
-// the icon on it (DrawIcon). Scales with its size (32 x 32 like a cell by default).
+/// <summary>
+/// A button drawn like a board cell: a raised tile with the cells' hover and press look.
+/// </summary>
+/// <remarks>
+/// Subclasses draw the icon on it (<see cref="DrawIcon"/>). Scales with its size (32 x 32 like a cell by
+/// default).
+/// </remarks>
 public abstract class TileButton : Control
 {
-    // Raised when the button is pressed and released with the left mouse button while over it.
+    /// <summary>
+    /// Raised when the button is pressed and released with the left mouse button while over it.
+    /// </summary>
     public event EventHandler? Click;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="TileButton"/> class, which looks up its colours again and
+    /// redraws when the theme changes.
+    /// </summary>
     protected TileButton()
     {
         ActualThemeVariantChanged += (sender, e) =>
@@ -22,11 +33,25 @@ public abstract class TileButton : Control
         };
     }
 
-    // Draws the icon in tile units (a 32 x 32 tile), e.g. with TileShapes.DrawIcon.
+    /// <summary>
+    /// Draws the icon in tile units (a 32 x 32 tile), e.g. with <see cref="TileShapes.DrawIcon"/>.
+    /// </summary>
+    /// <param name="context">The drawing context, already transformed to tile units.</param>
+    /// <param name="palette">The theme brushes to draw with.</param>
     private protected abstract void DrawIcon(DrawingContext context, TilePalette palette);
 
+    /// <summary>
+    /// Asks for the size of one tile (32 x 32).
+    /// </summary>
+    /// <param name="availableSize">The available size (ignored).</param>
+    /// <returns>The desired size.</returns>
     protected override Size MeasureOverride(Size availableSize) => new Size(TileShapes.TileSize, TileShapes.TileSize);
 
+    /// <summary>
+    /// Draws the tile, scaled to the largest square that fits and centred, with its hover and pressed look,
+    /// and then the icon.
+    /// </summary>
+    /// <param name="context">The drawing context.</param>
     public override void Render(DrawingContext context)
     {
         TilePalette palette = _palette ??= new TilePalette(this);
@@ -45,9 +70,17 @@ public abstract class TileButton : Control
 
     // ---- Input ----
 
+    /// <summary>
+    /// Whether the pointer is over the button.
+    /// </summary>
     private bool _hover;
+
+    /// <summary>
+    /// Whether the left mouse button was pressed on the button and not yet released (the pointer is captured).
+    /// </summary>
     private bool _pressed;
 
+    /// <inheritdoc/>
     protected override void OnPointerEntered(PointerEventArgs e)
     {
         base.OnPointerEntered(e);
@@ -55,6 +88,7 @@ public abstract class TileButton : Control
         InvalidateVisual();
     }
 
+    /// <inheritdoc/>
     protected override void OnPointerExited(PointerEventArgs e)
     {
         base.OnPointerExited(e);
@@ -62,6 +96,10 @@ public abstract class TileButton : Control
         InvalidateVisual();
     }
 
+    /// <summary>
+    /// Starts a press on the left mouse button and captures the pointer.
+    /// </summary>
+    /// <param name="e">The event data.</param>
     protected override void OnPointerPressed(PointerPressedEventArgs e)
     {
         base.OnPointerPressed(e);
@@ -74,6 +112,10 @@ public abstract class TileButton : Control
         }
     }
 
+    /// <summary>
+    /// While pressed, tracks whether the pointer is still over the button.
+    /// </summary>
+    /// <param name="e">The event data.</param>
     protected override void OnPointerMoved(PointerEventArgs e)
     {
         base.OnPointerMoved(e);
@@ -89,6 +131,11 @@ public abstract class TileButton : Control
         }
     }
 
+    /// <summary>
+    /// Ends a left-button press, releases the pointer and raises <see cref="Click"/> if the pointer is still
+    /// over the button.
+    /// </summary>
+    /// <param name="e">The event data.</param>
     protected override void OnPointerReleased(PointerReleasedEventArgs e)
     {
         base.OnPointerReleased(e);
@@ -107,6 +154,10 @@ public abstract class TileButton : Control
         }
     }
 
+    /// <summary>
+    /// Cancels the press (without a <see cref="Click"/>) when the pointer capture is lost.
+    /// </summary>
+    /// <param name="e">The event data.</param>
     protected override void OnPointerCaptureLost(PointerCaptureLostEventArgs e)
     {
         base.OnPointerCaptureLost(e);
@@ -114,5 +165,8 @@ public abstract class TileButton : Control
         InvalidateVisual();
     }
 
+    /// <summary>
+    /// The theme brushes, created on first render and dropped when the theme changes.
+    /// </summary>
     private TilePalette? _palette;
 }

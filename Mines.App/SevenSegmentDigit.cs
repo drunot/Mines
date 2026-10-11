@@ -5,44 +5,75 @@ using Avalonia.Media;
 
 namespace Mines;
 
-// One seven-segment digit (resources/Seven_Segment.Inkscape.svg). Value 0-9 lights the segments for that digit;
-// null turns every segment off (an unused digit). Minus lights only the middle segment.
-// Colours come from the theme: SegmentOnBrush and SegmentOffBrush.
+/// <summary>
+/// One seven-segment digit (resources/Seven_Segment.Inkscape.svg).
+/// </summary>
+/// <remarks>
+/// <see cref="Value"/> 0-9 lights the segments for that digit; <c>null</c> turns every segment off (an unused
+/// digit). <see cref="Minus"/> lights only the middle segment.
+/// Colours come from the theme: <c>SegmentOnBrush</c> and <c>SegmentOffBrush</c>.
+/// </remarks>
 public class SevenSegmentDigit : Control
 {
+    /// <summary>
+    /// Defines the <see cref="Value"/> property.
+    /// </summary>
     public static readonly StyledProperty<int?> ValueProperty =
         AvaloniaProperty.Register<SevenSegmentDigit, int?>(nameof(Value));
 
+    /// <summary>
+    /// Defines the <see cref="Minus"/> property.
+    /// </summary>
     public static readonly StyledProperty<bool> MinusProperty =
         AvaloniaProperty.Register<SevenSegmentDigit, bool>(nameof(Minus));
 
-    // 0-9, or null for all segments off. Values outside 0-9 are shown as all off.
+    /// <summary>
+    /// Gets or sets the digit shown: 0-9, or <c>null</c> for all segments off. Values outside 0-9 are shown as
+    /// all off.
+    /// </summary>
     public int? Value
     {
         get => GetValue(ValueProperty);
         set => SetValue(ValueProperty, value);
     }
 
-    // Shows a minus sign (middle segment only) when Value is null.
+    /// <summary>
+    /// Gets or sets whether a minus sign (middle segment only) is shown when <see cref="Value"/> is <c>null</c>.
+    /// </summary>
     public bool Minus
     {
         get => GetValue(MinusProperty);
         set => SetValue(MinusProperty, value);
     }
 
+    /// <summary>
+    /// Makes the digit redraw when <see cref="Value"/> or <see cref="Minus"/> changes.
+    /// </summary>
     static SevenSegmentDigit()
     {
         AffectsRender<SevenSegmentDigit>(ValueProperty, MinusProperty);
     }
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="SevenSegmentDigit"/> class, which redraws when the theme
+    /// changes.
+    /// </summary>
     public SevenSegmentDigit()
     {
         ActualThemeVariantChanged += (sender, e) => InvalidateVisual();
     }
 
-    // 24 px tall by default, with the SVG's proportions.
+    /// <summary>
+    /// Asks for 24 px tall by default, with the SVG's proportions.
+    /// </summary>
+    /// <param name="availableSize">The available size (ignored).</param>
+    /// <returns>The desired size.</returns>
     protected override Size MeasureOverride(Size availableSize) => new Size(24 * SvgWidth / SvgHeight, 24);
 
+    /// <summary>
+    /// Draws the seven segments, lit or unlit, scaled to fit the control and centred.
+    /// </summary>
+    /// <param name="context">The drawing context.</param>
     public override void Render(DrawingContext context)
     {
         IBrush on = Brush("SegmentOnBrush");
@@ -62,15 +93,30 @@ public class SevenSegmentDigit : Control
         }
     }
 
+    /// <summary>
+    /// Looks up a brush resource from the theme.
+    /// </summary>
+    /// <param name="key">The resource key, e.g. <c>SegmentOnBrush</c>.</param>
+    /// <returns>The brush, or magenta if the resource is missing.</returns>
     private IBrush Brush(string key) =>
         this.TryFindResource(key, ActualThemeVariant, out object? value) && value is IBrush brush ? brush : Brushes.Magenta;
 
     // ---- Segments: bit 0 = a (top), then b (upper right), c (lower right), d (bottom), e (lower left),
     //      f (upper left), g (middle) ----
 
+    /// <summary>
+    /// Bit masks for the segments a-g; a digit's lit segments are these ORed together.
+    /// </summary>
     private const int A = 1, B = 2, C = 4, D = 8, E = 16, F = 32, G = 64;
+
+    /// <summary>
+    /// The segments lit for a minus sign: the middle one.
+    /// </summary>
     private const int MinusSegments = G;
 
+    /// <summary>
+    /// The segments lit for each digit 0-9, indexed by the digit.
+    /// </summary>
     private static readonly int[] DigitSegments =
     {
         A | B | C | D | E | F,      // 0
@@ -85,11 +131,24 @@ public class SevenSegmentDigit : Control
         A | B | C | D | F | G,      // 9
     };
 
+    /// <summary>
+    /// The width of the digit in the SVG's coordinates.
+    /// </summary>
     private const double SvgWidth = 119.15862;
+
+    /// <summary>
+    /// The height of the digit in the SVG's coordinates.
+    /// </summary>
     private const double SvgHeight = 214.31094;
+
+    /// <summary>
+    /// The offset that moves the segments' path data to the origin.
+    /// </summary>
     private static readonly Vector SvgOffset = new(-36.759513, -37.746533);   // the SVG's translate(...)
 
-    // In the order a-g, from the SVG.
+    /// <summary>
+    /// The segment shapes, in the order a-g, from the SVG. Parsed on first use.
+    /// </summary>
     private static Geometry[] Segments => _segments ??= new[]
     {
         Geometry.Parse("m 49.459513,37.746533 -3.58066,6.202206 21.060214,21.060213 h 58.798993 l 21.06073,-21.060213 -3.58118,-6.202206 z"),
@@ -101,5 +160,8 @@ public class SevenSegmentDigit : Control
         Geometry.Parse("m 66.947077,131.27054 -13.374894,13.37489 13.888041,13.88805 h 58.270346 l 13.37489,-13.3749 -13.88804,-13.88804 z"),
     };
 
+    /// <summary>
+    /// Cache for <see cref="Segments"/>.
+    /// </summary>
     private static Geometry[]? _segments;
 }

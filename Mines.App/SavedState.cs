@@ -6,21 +6,37 @@ using System.Text.Json.Serialization;
 
 namespace Mines;
 
-// What is remembered between runs: the last settings, and the board if a game was left unfinished.
-// Stored as JSON in the user's settings folder (~/.config/Mines/state.json on Linux,
-// %APPDATA%\Mines\state.json on Windows).
+/// <summary>
+/// What is remembered between runs: the last settings, and the board if a game was left unfinished.
+/// </summary>
+/// <remarks>
+/// Stored as JSON in the user's settings folder (~/.config/Mines/state.json on Linux,
+/// %APPDATA%\Mines\state.json on Windows).
+/// </remarks>
 public sealed class SavedState
 {
+    /// <summary>
+    /// The last used settings.
+    /// </summary>
     public SavedSettings Settings { get; set; } = new();
 
-    // Only an unfinished game: started (bombs placed), and neither lost nor won.
+    /// <summary>
+    /// The game in progress, or null. Only an unfinished game: started (bombs placed), and neither lost nor won.
+    /// </summary>
     public SavedGame? Game { get; set; }
 
-    // Settable so tests can use another file.
+    /// <summary>
+    /// The path of the state file. Settable so tests can use another file.
+    /// </summary>
     public static string FilePath { get; set; } = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Mines", "state.json");
 
-    // The saved state, or null if there is none or it can't be read (then the game starts with its defaults).
+    /// <summary>
+    /// Reads the state from <see cref="FilePath"/>.
+    /// </summary>
+    /// <returns>
+    /// The saved state, or null if there is none or it can't be read (then the game starts with its defaults).
+    /// </returns>
     public static SavedState? Load()
     {
         try
@@ -33,7 +49,12 @@ public sealed class SavedState
         }
     }
 
-    // Saving is best effort: if the file can't be written, the game just starts fresh next time.
+    /// <summary>
+    /// Writes this state to <see cref="FilePath"/>.
+    /// </summary>
+    /// <remarks>
+    /// Saving is best effort: if the file can't be written, the game just starts fresh next time.
+    /// </remarks>
     public void Save()
     {
         try
@@ -49,6 +70,9 @@ public sealed class SavedState
         }
     }
 
+    /// <summary>
+    /// JSON options for the state file: indented, with enums written as names.
+    /// </summary>
     private static readonly JsonSerializerOptions s_json = new()
     {
         WriteIndented = true,
@@ -56,25 +80,70 @@ public sealed class SavedState
     };
 }
 
+/// <summary>
+/// The saved game settings: board size, bomb count and generator.
+/// </summary>
 public sealed class SavedSettings
 {
+    /// <summary>
+    /// The number of rows.
+    /// </summary>
     public int Rows { get; set; } = 15;
+    /// <summary>
+    /// The number of columns.
+    /// </summary>
     public int Columns { get; set; } = 25;
+    /// <summary>
+    /// The number of bombs.
+    /// </summary>
     public int BombCount { get; set; } = 75;
+    /// <summary>
+    /// Which generator makes new boards.
+    /// </summary>
     public GeneratorKind Generator { get; set; } = GeneratorKind.NoGuessing;
 }
 
-// An unfinished board. Cells are Field.Index values (row * Columns + column).
+/// <summary>
+/// An unfinished board. Cells are <c>Field.Index</c> values (row * Columns + column).
+/// </summary>
 public sealed class SavedGame
 {
+    /// <summary>
+    /// The number of rows of the board.
+    /// </summary>
     public int Rows { get; set; }
+    /// <summary>
+    /// The number of columns of the board.
+    /// </summary>
     public int Columns { get; set; }
+    /// <summary>
+    /// The cells that hold a bomb.
+    /// </summary>
     public int[] Bombs { get; set; } = [];
+    /// <summary>
+    /// The revealed cells.
+    /// </summary>
     public int[] Revealed { get; set; } = [];
+    /// <summary>
+    /// The flagged cells.
+    /// </summary>
     public int[] Flagged { get; set; } = [];
+    /// <summary>
+    /// The question-marked cells.
+    /// </summary>
     public int[] Questioned { get; set; } = [];
+    /// <summary>
+    /// The time played so far, in seconds.
+    /// </summary>
     public double ElapsedSeconds { get; set; }
 
+    /// <summary>
+    /// Captures a board in a <see cref="SavedGame"/>.
+    /// </summary>
+    /// <param name="board">The board to save.</param>
+    /// <param name="questioned">The question-marked cells (<c>Field.Index</c> values).</param>
+    /// <param name="elapsed">The time played so far.</param>
+    /// <returns>The saved game.</returns>
     public static SavedGame From(FieldMatrix board, System.Collections.Generic.IEnumerable<int> questioned, TimeSpan elapsed)
     {
         var fields = board.Fields.Cast<Field>().ToList();
@@ -90,7 +159,13 @@ public sealed class SavedGame
         };
     }
 
-    // Guards against a damaged or hand-edited file: sizes in range, cells on the board, no revealed bomb.
+    /// <summary>
+    /// Checks that the saved game can be restored.
+    /// </summary>
+    /// <remarks>
+    /// Guards against a damaged or hand-edited file: sizes in range, cells on the board, no revealed bomb.
+    /// </remarks>
+    /// <returns>True if the saved game is usable.</returns>
     public bool IsValid()
     {
         int cells = Rows * Columns;
@@ -100,7 +175,10 @@ public sealed class SavedGame
             && !Revealed.Intersect(Bombs).Any() && ElapsedSeconds >= 0;
     }
 
-    // A board in the saved state: bombs placed, the revealed cells revealed and the flags set.
+    /// <summary>
+    /// Restores the board.
+    /// </summary>
+    /// <returns>A board in the saved state: bombs placed, the revealed cells revealed and the flags set.</returns>
     public FieldMatrix ToBoard()
     {
         var bombs = new bool[Rows, Columns];

@@ -3,8 +3,13 @@ using System.Linq;
 namespace Mines.Solving;
 
 
+/// <summary>
+/// A simple solver that only looks at single numbers: flags all hidden neighbours if their count
+/// equals the number, and reveals the unflagged ones if the flags already account for the number.
+/// </summary>
 class NeighborSolver : ISolver
 {
+    /// <inheritdoc/>
     public void Solve(FieldMatrix fieldMatrix)
     {
         while (true)

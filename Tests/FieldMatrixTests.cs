@@ -11,11 +11,11 @@ public class FieldMatrixTests
     // Hidden cells without a flag.
     private static int CountUnknown(FieldMatrix matrix) => Boards.All(matrix).Count(f => f.Hidden && !f.Flagged);
 
-    // Bombs minus flags placed, minus bombs revealed (only when the game is lost).
+    // Bombs minus flags placed. Revealed bombs (a lost game) don't count.
     private static int CountBombsLeft(FieldMatrix matrix)
     {
         var fields = Boards.All(matrix).ToList();
-        return fields.Count(f => f.IsBomb) - fields.Count(f => f.Flagged) - fields.Count(f => f.IsBomb && !f.Hidden);
+        return fields.Count(f => f.IsBomb) - fields.Count(f => f.Flagged);
     }
 
     private static void AssertCountersMatch(FieldMatrix matrix, string where)
@@ -76,6 +76,43 @@ public class FieldMatrixTests
         Assert.True(matrix[0, 0].Hidden);
         Assert.False(matrix[0, 0].Flagged);
         AssertCountersMatch(matrix, "after revealing a flagged cell");
+    }
+
+    [Fact]
+    public void Counters_follow_hiding_a_field_again()
+    {
+        FieldMatrix matrix = SmallBoard();
+        matrix[0, 1].Hidden = false;
+
+        matrix[0, 1].Hidden = true;
+
+        Assert.Equal(20, matrix.FieldsLeft);
+        AssertCountersMatch(matrix, "after hiding a field again");
+    }
+
+    [Fact]
+    public void Losing_does_not_change_the_bomb_counter()
+    {
+        FieldMatrix matrix = SmallBoard();
+        matrix[0, 0].Flagged = true;
+
+        matrix[3, 4].Hidden = false;   // a bomb: the game is lost
+
+        Assert.True(matrix.GameLost);
+        Assert.Equal(1, matrix.BombsLeft);
+        AssertCountersMatch(matrix, "after losing");
+    }
+
+    [Fact]
+    public void Classic_generator_keeps_the_first_click_free()
+    {
+        // 9 cells and 8 bombs: the only free cell must be the clicked one.
+        for (int seed = 0; seed < 20; ++seed)
+        {
+            var generator = new Mines.Generators.ClassicRandomGenerator(new System.Random(seed));
+            bool[,] bombs = generator.Generate(3, 3, new Point<int>(1, 2), 8);
+            Assert.False(bombs[1, 2], $"seed {seed} put a bomb under the first click");
+        }
     }
 
     // A full solve reveals and flags many cells; the copy constructor's counters are checked too.

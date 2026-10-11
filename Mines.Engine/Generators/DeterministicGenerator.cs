@@ -6,20 +6,42 @@ using Mines.BoardFixer;
 namespace Mines.Generators;
 
 
+/// <summary>
+/// Generates boards that can be solved without guessing from the first reveal.
+/// </summary>
+/// <remarks>
+/// Places bombs at random outside the 3x3 area around the first reveal, then runs
+/// <see cref="ConstraintSolver"/>. If the board can't be solved, <see cref="EdgeBoardFixer"/> moves
+/// bombs and the solver is tried again, up to <see cref="fix_attempts"/> times; after that, or if the
+/// fixer fails, it starts over with a new random board.
+/// </remarks>
 public class DeterministicGenerator : IMatrixGenerator
 {
 
+    /// <summary>
+    /// Creates the generator.
+    /// </summary>
+    /// <param name="random">The random number source, also used by the board fixer; a new <see cref="Random"/> if <c>null</c>.</param>
     public DeterministicGenerator(Random? random = null)
     {
         _rand = random ?? new Random();
         _fixer = new EdgeBoardFixer(_rand);
     }
 
+    /// <summary>The random number source.</summary>
     Random _rand;
 
+    /// <summary>Checks whether a generated board can be solved without guessing.</summary>
     ISolver _solver = new ConstraintSolver();
+    /// <summary>Moves bombs on boards the solver got stuck on.</summary>
     iBoardFixer _fixer;
 
+    /// <summary>
+    /// Whether <paramref name="position"/> is within the 3x3 area around <paramref name="first_reveal"/>.
+    /// </summary>
+    /// <param name="first_reveal">The first revealed field.</param>
+    /// <param name="position">The position to test.</param>
+    /// <returns><c>true</c> if the position is in the start area.</returns>
     bool WithinStart(Point<int> first_reveal, Point<int> position)
     {
         if (position.X >= first_reveal.X - 1 &&
@@ -32,8 +54,11 @@ public class DeterministicGenerator : IMatrixGenerator
         return false;
     }
 
+    /// <summary>How many times a board is fixed and solved again before starting over.</summary>
     const int fix_attempts = 40;
 
+    /// <inheritdoc/>
+    /// <exception cref="ArgumentException">There are not enough cells outside the start area for <paramref name="bomb_count"/> bombs.</exception>
     public bool[,] Generate(int rows, int columns, Point<int> first_reveal, int bomb_count)
     {
         while (true)

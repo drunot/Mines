@@ -6,12 +6,36 @@ using System.Diagnostics.CodeAnalysis;
 namespace Mines.Solving;
 
 
-public enum Rule { Neighbor = 0, Subset = 1, Enumeration = 2 }
+/// <summary>
+/// The solving rules that each have their own queue of changed equations in <see cref="EquationList"/>.
+/// </summary>
+public enum Rule
+{
+    /// <summary>Single-equation reasoning: all-bombs or all-safe (<see cref="NeighborStrategy"/>).</summary>
+    Neighbor = 0,
+    /// <summary>Comparing equations where one's cells contain the other's (<see cref="SubsetStrategy"/>).</summary>
+    Subset = 1,
+    /// <summary>Trying every bomb arrangement in a group of cells (<see cref="EnumerationStrategy"/>).</summary>
+    Enumeration = 2,
+}
 
+/// <summary>
+/// All equations the solver knows about, indexed by cell, with a queue of changed equations per
+/// <see cref="Rule"/>.
+/// </summary>
 public class EquationList
 {
 
+    /// <summary>
+    /// The global equation (all remaining cells add up to the bombs left) is created once at most this
+    /// many fields are left.
+    /// </summary>
     const int FieldsBeforeLast = 20;
+    /// <summary>
+    /// Creates and adds the global equation (every hidden, unflagged cell; sum is
+    /// <see cref="FieldMatrix.BombsLeft"/>) once few enough fields are left. Does nothing if it already
+    /// exists or more than <see cref="FieldsBeforeLast"/> fields are left.
+    /// </summary>
     public void TryCreateGlobalEquation()
     {
         if (_global is not null || _matrix.FieldsLeft > FieldsBeforeLast)
@@ -30,13 +54,21 @@ public class EquationList
         Add(_global);
     }
 
+    /// <summary>
+    /// The global equation over all remaining cells, or <c>null</c> if it hasn't been created yet.
+    /// </summary>
     public Equation? Global
     {
         get => _global;
     }
 
+    /// <summary>Backing field for <see cref="Global"/>.</summary>
     Equation? _global = null;
 
+    /// <summary>
+    /// Creates an empty equation list for <paramref name="matrix"/>.
+    /// </summary>
+    /// <param name="matrix">The board the equations describe.</param>
     public EquationList(FieldMatrix matrix)
     {
         _matrix = matrix;
@@ -45,7 +77,11 @@ public class EquationList
 
     FieldMatrix _matrix;
 
-    // New equation: store it, list it under its cells, and queue it.
+    /// <summary>
+    /// New equation: store it, list it under its cells, and queue it. Empty equations and equations equal
+    /// to an existing one are ignored.
+    /// </summary>
+    /// <param name="equation">The equation to add.</param>
     public void Add(Equation equation)
     {
         if (equation.Count == 0)
@@ -64,18 +100,34 @@ public class EquationList
         MarkChanged(equation);
     }
 
-    // A revealed cell is safe: drop it from every equation, the sums stay the same.
+    /// <summary>
+    /// A revealed cell is safe: drop it from every equation, the sums stay the same.
+    /// </summary>
+    /// <param name="cell">The <see cref="Field.Index"/> of the cell.</param>
     public void MarkSafe(int cell) => RemoveVariable(cell, 0);
 
-    // A flagged cell is a bomb: drop it from every equation and lower their sums.
+    /// <summary>
+    /// A flagged cell is a bomb: drop it from every equation and lower their sums.
+    /// </summary>
+    /// <param name="cell">The <see cref="Field.Index"/> of the cell.</param>
     public void MarkBomb(int cell) => RemoveVariable(cell, 1);
 
-    // The equations that contain this cell, for the subset step.
+    /// <summary>
+    /// The equations that contain this cell, for the subset step.
+    /// </summary>
+    /// <param name="cell">The <see cref="Field.Index"/> of the cell.</param>
+    /// <returns>The equations containing the cell; empty if there are none.</returns>
     public IReadOnlyList<Equation> Containing(int cell)
     {
         return (IReadOnlyList<Equation>?)_equation_record[cell] ?? Array.Empty<Equation>();
     }
 
+    /// <summary>
+    /// Takes the next non-empty equation waiting in the queue for <paramref name="rule"/>.
+    /// </summary>
+    /// <param name="rule">The rule whose queue to take from.</param>
+    /// <param name="equation">The equation taken; undefined when the method returns <c>false</c>.</param>
+    /// <returns><c>true</c> if an equation was taken; <c>false</c> if the queue is empty.</returns>
     public bool TryTakeChanged(Rule rule, out Equation equation)
     {
         int r = (int)rule;
@@ -95,6 +147,12 @@ public class EquationList
         return false;
     }
 
+    /// <summary>
+    /// Drops <paramref name="cell"/> from every equation containing it, lowers their sums by
+    /// <paramref name="bombs"/> and queues them again.
+    /// </summary>
+    /// <param name="cell">The <see cref="Field.Index"/> of the cell.</param>
+    /// <param name="bombs">1 if the cell is a bomb, 0 if it is safe.</param>
     private void RemoveVariable(int cell, int bombs)
     {
         List<Equation>? containing = _equation_record[cell];
@@ -111,6 +169,11 @@ public class EquationList
         containing.Clear();
     }
 
+    /// <summary>
+    /// Subset step: for every equation that is a subset or superset of <paramref name="equation"/>, adds
+    /// the difference of the two as a new equation. The global equation is ignored.
+    /// </summary>
+    /// <param name="equation">The equation to compare the others against.</param>
     public void RemoveSubset(Equation equation)
     {
         // Ignore Global for this.
@@ -155,7 +218,10 @@ public class EquationList
         }
     }
 
-    // Queue the equation for every rule; it changed, so each rule may now apply to it.
+    /// <summary>
+    /// Queue the equation for every rule; it changed, so each rule may now apply to it.
+    /// </summary>
+    /// <param name="equation">The changed equation.</param>
     private void MarkChanged(Equation equation)
     {
         for (int rule = 0; rule < _pending.Length; ++rule)
@@ -169,11 +235,22 @@ public class EquationList
         }
     }
 
+    /// <summary>Cell index -&gt; equations containing it (<c>null</c> if none yet).</summary>
     private readonly List<Equation>?[] _equation_record;   // cell index -> equations containing it
+    /// <summary>One queue of changed equations per <see cref="Rule"/>.</summary>
     private readonly Queue<Equation>[] _pending = { new(), new(), new() };
 
+    /// <summary>The largest number of cells a group for the enumeration step may have.</summary>
     const int MaxCellsInGroup = 40; // Could be encased later.
 
+    /// <summary>
+    /// Collects the group of equations connected to <paramref name="equation"/> through shared cells, up
+    /// to <see cref="MaxCellsInGroup"/> cells, skipping the global equation (unless it is the start).
+    /// Equations added to the group are taken out of the enumeration queue.
+    /// </summary>
+    /// <param name="equation">The equation to start from.</param>
+    /// <param name="cells">All cells of the group's equations.</param>
+    /// <returns>The equations of the group, compared by identity.</returns>
     private HashSet<Equation> GetGroupFromEquation(Equation equation, out HashSet<int> cells)
     {
         HashSet<Equation> equations = new HashSet<Equation>(EquationIdentity.Instance);
@@ -220,8 +297,18 @@ public class EquationList
         return equations;
     }
 
+    /// <summary>
+    /// Set when the global equation came up in the enumeration queue, so its group needs enumerating again.
+    /// </summary>
     private bool _global_pending = false;
 
+    /// <summary>
+    /// Takes the group of the next changed equation waiting for <see cref="Rule.Enumeration"/>. The global
+    /// equation is never used as the start; it is remembered for <see cref="TryTakeGlobalGroup"/> instead.
+    /// </summary>
+    /// <param name="equations">The equations of the group.</param>
+    /// <param name="cells">The cells of the group.</param>
+    /// <returns><c>true</c> if a group was taken; <c>false</c> if the queue is empty.</returns>
     public bool TryTakeEnumerationGroup(
         [NotNullWhen(true)] out HashSet<Equation>? equations,
         [NotNullWhen(true)] out HashSet<int>? cells)
@@ -246,6 +333,12 @@ public class EquationList
         return false;
     }
 
+    /// <summary>
+    /// Takes the group of the global equation, if it changed since it was last taken.
+    /// </summary>
+    /// <param name="equations">The equations of the group.</param>
+    /// <param name="cells">The cells of the group.</param>
+    /// <returns><c>true</c> if a group was taken; <c>false</c> otherwise.</returns>
     public bool TryTakeGlobalGroup(
         [NotNullWhen(true)] out HashSet<Equation>? equations,
         [NotNullWhen(true)] out HashSet<int>? cells)

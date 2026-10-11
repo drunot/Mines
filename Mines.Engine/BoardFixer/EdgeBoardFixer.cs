@@ -6,13 +6,31 @@ using System.Diagnostics.CodeAnalysis;
 
 namespace Mines.BoardFixer;
 
+/// <summary>
+/// Fixes a stuck board at the edge of the revealed area: picks the revealed number that is cheapest to
+/// make decidable and either fills all its unknown neighbours with bombs, or moves all its remaining
+/// bombs away into the untouched part of the board.
+/// </summary>
 public class EdgeBoardFixer : iBoardFixer
 {
 
+    /// <summary>
+    /// A revealed numbered field considered for fixing, with a score of how many bombs need moving.
+    /// </summary>
+    /// <remarks>
+    /// The score is even (2 * bombs missing) for a "take" fix and odd (2 * bombs in excess - 1) for a
+    /// "give" fix, so one number encodes both the cost and the kind of fix. Lower is better;
+    /// <see cref="ErrorScore"/> means the field can't be used.
+    /// </remarks>
     class FieldCandidate
     {
+        /// <summary>The score of a field that can't be used for fixing; sorts last.</summary>
         public const int ErrorScore = 99999;
 
+        /// <summary>
+        /// Creates a candidate for <paramref name="field"/>.
+        /// </summary>
+        /// <param name="field">The revealed numbered field.</param>
         public FieldCandidate(Field field)
         {
             _field = field;
@@ -20,13 +38,20 @@ public class EdgeBoardFixer : iBoardFixer
 
         private Field _field;
 
+        /// <summary>The candidate field.</summary>
         public Field Field
         {
             get => _field;
         }
 
+        /// <summary>Cached <see cref="SelectionScore"/>; <c>null</c> until computed.</summary>
         private int? _score = null;
 
+        /// <summary>
+        /// Computes the score: the cheaper of filling all unknown neighbours with bombs ("take", even score)
+        /// or moving the remaining bombs away ("give", odd score).
+        /// </summary>
+        /// <returns>The score, or <see cref="ErrorScore"/> if the field can't be used.</returns>
         private int GenerateSelectionScore()
         {
             if (_field.Number is null || _field.Hidden)
@@ -49,6 +74,10 @@ public class EdgeBoardFixer : iBoardFixer
         }
 
 
+        /// <summary>
+        /// The selection score, computed on first use. Lower is better; see the remarks on
+        /// <see cref="FieldCandidate"/>.
+        /// </summary>
         public int SelectionScore
         {
             get
@@ -62,16 +91,19 @@ public class EdgeBoardFixer : iBoardFixer
             }
         }
 
+        /// <summary>Whether the fix is to add bombs to the unknown neighbours (even score).</summary>
         public bool ShouldTake
         {
             get => SelectionScore % 2 == 0;
         }
 
+        /// <summary>Whether the fix is to move bombs away from the neighbours (odd score, not an error).</summary>
         public bool ShouldGive
         {
             get => SelectionScore != ErrorScore && SelectionScore % 2 == 1;
         }
 
+        /// <summary>The number of bombs to add around the field; 0 for a "give" fix.</summary>
         public int BombsMissing
         {
             get
@@ -84,6 +116,7 @@ public class EdgeBoardFixer : iBoardFixer
             }
         }
 
+        /// <summary>The number of bombs to move away from around the field; 0 for a "take" fix.</summary>
         public int BombsInExcess
         {
             get
@@ -97,13 +130,23 @@ public class EdgeBoardFixer : iBoardFixer
         }
     }
 
+    /// <summary>
+    /// Creates the fixer.
+    /// </summary>
+    /// <param name="random">The random number source used to pick where bombs go; a new <see cref="Random"/> if <c>null</c>.</param>
     public EdgeBoardFixer(Random? random = null)
     {
         _rand = random ?? new Random();
     }
 
+    /// <summary>The random number source.</summary>
     private Random _rand;
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Swaps bombs with hidden fields whose neighbours are all hidden, so the revealed part of the board
+    /// stays consistent. Changes the bombs of <paramref name="board"/> itself as well.
+    /// </remarks>
     public bool FixBoard(FieldMatrix board, [NotNullWhen(true)] out bool[,]? fixed_board)
     {
         List<FieldCandidate> candidates = new List<FieldCandidate>();
