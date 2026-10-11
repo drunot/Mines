@@ -21,7 +21,7 @@ public class ConstraintSolver : ISolver
             {
                 if (neighbor.Hidden && !neighbor.Flagged)
                 {
-                    equation.variables.Add(neighbor.Position);
+                    equation.Add(neighbor.Index);
                 }
                 if (neighbor.IsBomb && !neighbor.Flagged)
                 {

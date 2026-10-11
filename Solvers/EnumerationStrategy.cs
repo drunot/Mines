@@ -9,7 +9,7 @@ class EnumerationStrategy : SolvingStrategyBase
     public override bool ApplyStrategy(FieldMatrix fieldMatrix, EquationList equations)
     {
         // Changed groups first; the global group is the last resort.
-        if (!equations.TryTakeEnumerationGroup(out HashSet<Equation>? equation_group, out HashSet<Point<int>>? cells) &&
+        if (!equations.TryTakeEnumerationGroup(out HashSet<Equation>? equation_group, out HashSet<int>? cells) &&
             !equations.TryTakeGlobalGroup(out equation_group, out cells))
         {
             return false;
@@ -50,25 +50,35 @@ class EnumerationStrategy : SolvingStrategyBase
     // One group converted to plain arrays, so the search avoids dictionaries and hashing.
     private sealed class Group
     {
-        public Group(HashSet<Equation> equation_group, HashSet<Point<int>> cells)
+        public Group(HashSet<Equation> equation_group, HashSet<int> cells)
         {
             Cells = OrderCells(equation_group, cells);
 
-            var index = new Dictionary<Point<int>, int>();   // cell -> index, used only during setup
+            var index = new Dictionary<int, int>();   // cell -> position in Cells, used only during setup
             for (int i = 0; i < Cells.Length; ++i)
             {
                 index[Cells[i]] = i;
             }
 
             // The equations of this group, written in terms of cell indices, not cells.
-            _eqs = equation_group.Select((e) => new EquationRecord(e.variables.Select((v) => index[v]).ToArray(), e.sum)).ToArray();
+            _eqs = new EquationRecord[equation_group.Count];
+            int k = 0;
+            foreach (Equation e in equation_group)
+            {
+                var vars = new int[e.Count];
+                for (int v = 0; v < e.Count; v++)
+                {
+                    vars[v] = index[e.Cells[v]];
+                }
+                _eqs[k++] = new EquationRecord(vars, e.sum);
+            }
             _eqs_of_var = EquationsOfEachCell(_eqs, Cells.Length);
             _values = new FieldValues[Cells.Length];   // all Unknown (the default)
             MineCount = new int[Cells.Length];
         }
 
-        // Index -> cell, numbered so cells that share equations are close together.
-        public Point<int>[] Cells { get; }
+        // Position -> cell (Field.Index), ordered so cells that share equations are close together.
+        public int[] Cells { get; }
 
         // MineCount[i]: in how many solutions Cells[i] was a bomb.
         public int[] MineCount { get; }
@@ -139,13 +149,13 @@ class EnumerationStrategy : SolvingStrategyBase
         }
 
         // Number the cells in the order a search through the equations reaches them.
-        private static Point<int>[] OrderCells(HashSet<Equation> equation_group, HashSet<Point<int>> cells)
+        private static int[] OrderCells(HashSet<Equation> equation_group, HashSet<int> cells)
         {
             // Cell -> the group's equations that contain it.
-            var eqs_of_cell = new Dictionary<Point<int>, List<Equation>>();
+            var eqs_of_cell = new Dictionary<int, List<Equation>>();
             foreach (Equation e in equation_group)
             {
-                foreach (Point<int> p in e.variables)
+                foreach (int p in e.Cells)
                 {
                     if (!eqs_of_cell.TryGetValue(p, out List<Equation>? list))
                     {
@@ -156,26 +166,26 @@ class EnumerationStrategy : SolvingStrategyBase
                 }
             }
 
-            var order = new List<Point<int>>(cells.Count);
-            var seen = new HashSet<Point<int>>();
-            foreach (Point<int> start in cells)   // more than one start in case the group isn't connected
+            var order = new List<int>(cells.Count);
+            var seen = new HashSet<int>();
+            foreach (int start in cells)   // more than one start in case the group isn't connected
             {
                 if (!seen.Add(start))
                 {
                     continue;
                 }
-                var queue = new Queue<Point<int>>();
+                var queue = new Queue<int>();
                 queue.Enqueue(start);
-                while (queue.TryDequeue(out Point<int>? p))
+                while (queue.TryDequeue(out int p))
                 {
                     order.Add(p);
                     foreach (Equation e in eqs_of_cell[p])
                     {
-                        if (e.variables.Count > 8)
+                        if (e.Count > 8)
                         {
                             continue;   // the global equation and its large differences: they'd link everything
                         }
-                        foreach (Point<int> q in e.variables)
+                        foreach (int q in e.Cells)
                         {
                             if (seen.Add(q))
                             {

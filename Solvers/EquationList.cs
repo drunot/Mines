@@ -18,12 +18,12 @@ public class EquationList
         {
             return;
         }
-        _global = new Equation();
+        _global = new Equation(Math.Max(1, _matrix.FieldsLeft));
         foreach (Field f in _matrix.Fields)
         {
             if (f.Hidden && !f.Flagged)
             {
-                _global.variables.Add(f.Position);
+                _global.Add(f.Index);
             }
         }
         _global.sum = _matrix.BombsLeft;
@@ -40,7 +40,7 @@ public class EquationList
     public EquationList(FieldMatrix matrix)
     {
         _matrix = matrix;
-        _equation_record = new List<Equation>[_matrix.Rows, _matrix.Columns];
+        _equation_record = new List<Equation>?[_matrix.Rows * _matrix.Columns];
     }
 
     FieldMatrix _matrix;
@@ -48,35 +48,32 @@ public class EquationList
     // New equation: store it, list it under its cells, and queue it.
     public void Add(Equation equation)
     {
-        if (equation.variables.Count == 0)
+        if (equation.Count == 0)
         {
             return;
         }
-        var first = equation.variables.First();
-        if (_equation_record[first.X, first.Y]?.Contains(equation) == true)
+        if (_equation_record[equation.First]?.Contains(equation) == true)
         {
             return;   // an equal equation already exists
         }
 
-        _equations.Add(equation);
-        foreach (var variable in equation.variables)
+        foreach (int cell in equation.Cells)
         {
-            _equation_record[variable.X, variable.Y] ??= new List<Equation>();
-            _equation_record[variable.X, variable.Y].Add(equation);
+            (_equation_record[cell] ??= new List<Equation>()).Add(equation);
         }
         MarkChanged(equation);
     }
 
     // A revealed cell is safe: drop it from every equation, the sums stay the same.
-    public void MarkSafe(Point<int> point) => RemoveVariable(point, 0);
+    public void MarkSafe(int cell) => RemoveVariable(cell, 0);
 
     // A flagged cell is a bomb: drop it from every equation and lower their sums.
-    public void MarkBomb(Point<int> point) => RemoveVariable(point, 1);
+    public void MarkBomb(int cell) => RemoveVariable(cell, 1);
 
     // The equations that contain this cell, for the subset step.
-    public IReadOnlyList<Equation> Containing(Point<int> point)
+    public IReadOnlyList<Equation> Containing(int cell)
     {
-        return (IReadOnlyList<Equation>?)_equation_record[point.X, point.Y] ?? Array.Empty<Equation>();
+        return (IReadOnlyList<Equation>?)_equation_record[cell] ?? Array.Empty<Equation>();
     }
 
     public bool TryTakeChanged(Rule rule, out Equation equation)
@@ -84,11 +81,13 @@ public class EquationList
         int r = (int)rule;
         while (_pending[r].TryDequeue(out equation!))
         {
-            if (!_queued[r].Remove(equation))
+            byte bit = (byte)(1 << r);
+            if ((equation.QueuedRules & bit) == 0)
             {
                 continue;   // removed from the queue earlier, e.g. as part of a group
             }
-            if (equation.variables.Count != 0)
+            equation.QueuedRules &= (byte)~bit;
+            if (equation.Count != 0)
             {
                 return true;
             }
@@ -96,21 +95,17 @@ public class EquationList
         return false;
     }
 
-    private void RemoveVariable(Point<int> point, int bombs)
+    private void RemoveVariable(int cell, int bombs)
     {
-        List<Equation>? containing = _equation_record[point.X, point.Y];
+        List<Equation>? containing = _equation_record[cell];
         if (containing is null)
         {
             return;
         }
         foreach (Equation equation in containing)
         {
-            equation.variables.Remove(point);
+            equation.Remove(cell);
             equation.sum -= bombs;
-            if (equation.variables.Count == 0)
-            {
-                _equations.Remove(equation);
-            }
             MarkChanged(equation);   // it lost a cell, so the rules may now apply to it
         }
         containing.Clear();
@@ -119,15 +114,19 @@ public class EquationList
     public void RemoveSubset(Equation equation)
     {
         // Ignore Global for this.
-        if (equation.variables.Count == 0 || ReferenceEquals(equation, _global))
+        if (equation.Count == 0 || ReferenceEquals(equation, _global))
         {
             return;
         }
 
         var candidates = new HashSet<Equation>(EquationIdentity.Instance);
-        foreach (var variable in equation.variables)
+        foreach (int cell in equation.Cells)
         {
-            candidates.UnionWith(_equation_record[variable.X, variable.Y]);
+            List<Equation>? containing = _equation_record[cell];
+            if (containing is not null)
+            {
+                candidates.UnionWith(containing);
+            }
         }
         candidates.Remove(equation);
         if (_global is not null)
@@ -137,17 +136,17 @@ public class EquationList
         var differences = new List<Equation>();
         foreach (Equation test_equation in candidates)
         {
-            if (test_equation.variables.Count == 0)
+            if (test_equation.Count == 0)
             {
                 continue;
             }
-            if (test_equation.variables.IsSubsetOf(equation.variables))
+            if (test_equation.IsSubsetOf(equation))
             {
-                differences.Add(Difference(equation, test_equation));
+                differences.Add(equation.Minus(test_equation));
             }
-            else if (equation.variables.IsSubsetOf(test_equation.variables))
+            else if (equation.IsSubsetOf(test_equation))
             {
-                differences.Add(Difference(test_equation, equation));
+                differences.Add(test_equation.Minus(equation));
             }
         }
         foreach (Equation difference in differences)
@@ -156,67 +155,63 @@ public class EquationList
         }
     }
 
-    private static Equation Difference(Equation bigger, Equation smaller)
-    {
-        var difference = new Equation();
-        difference.variables = [.. bigger.variables];
-        difference.variables.ExceptWith(smaller.variables);
-        difference.sum = bigger.sum - smaller.sum;
-        return difference;
-    }
-    // Next equation that changed since it was last taken, skipping solved ones.
+    // Queue the equation for every rule; it changed, so each rule may now apply to it.
     private void MarkChanged(Equation equation)
     {
         for (int rule = 0; rule < _pending.Length; ++rule)
         {
-            if (_queued[rule].Add(equation))
+            byte bit = (byte)(1 << rule);
+            if ((equation.QueuedRules & bit) == 0)   // not already waiting for this rule
             {
+                equation.QueuedRules |= bit;
                 _pending[rule].Enqueue(equation);
             }
         }
     }
 
-    private readonly HashSet<Equation> _equations = new(EquationIdentity.Instance);
-    private readonly List<Equation>[,] _equation_record;
+    private readonly List<Equation>?[] _equation_record;   // cell index -> equations containing it
     private readonly Queue<Equation>[] _pending = { new(), new(), new() };
-    private readonly HashSet<Equation>[] _queued =
-    {
-        new(EquationIdentity.Instance),
-        new(EquationIdentity.Instance),
-        new(EquationIdentity.Instance),
-    };
 
     const int MaxCellsInGroup = 40; // Could be encased later.
 
-    private HashSet<Equation> GetGroupFromEquation(Equation equation, out HashSet<Point<int>> cells)
+    private HashSet<Equation> GetGroupFromEquation(Equation equation, out HashSet<int> cells)
     {
         HashSet<Equation> equations = new HashSet<Equation>(EquationIdentity.Instance);
-        HashSet<Point<int>> local_cells = [.. equation.variables];
-        var checked_points = new HashSet<Point<int>>();
+        var local_cells = new HashSet<int>(equation.ToArray());
+        var checked_cells = new HashSet<int>();
         equations.Add(equation);
-        var to_visit = new Queue<Point<int>>(equation.variables);
-        while (to_visit.TryDequeue(out Point<int>? v))
+        var to_visit = new Queue<int>(equation.ToArray());
+        while (to_visit.TryDequeue(out int v))
         {
-            if (!checked_points.Add(v))
+            if (!checked_cells.Add(v))
             {
                 continue;   // already visited
             }
-            foreach (Equation e in _equation_record[v.X, v.Y])
+            List<Equation>? containing = _equation_record[v];
+            if (containing is null)
+            {
+                continue;
+            }
+            foreach (Equation e in containing)
             {
                 if (ReferenceEquals(e, _global) || equations.Contains(e))
                 {
                     continue;   // the global equation, or already in the group
                 }
-                int new_cells = e.variables.Count(p => !local_cells.Contains(p));
+                int new_cells = 0;
+                foreach (int c in e.Cells)
+                {
+                    new_cells += local_cells.Contains(c) ? 0 : 1;
+                }
                 if (local_cells.Count + new_cells > MaxCellsInGroup)
                 {
                     continue;   // doesn't fit; it stays queued and can start its own piece later
                 }
                 equations.Add(e);
-                local_cells.UnionWith(e.variables);
-                _queued[(int)Rule.Enumeration].Remove(e);
-                foreach (Point<int> next in e.variables)
+                e.QueuedRules &= unchecked((byte)~(1 << (int)Rule.Enumeration));   // covered by this group
+                foreach (int next in e.Cells)
                 {
+                    local_cells.Add(next);
                     to_visit.Enqueue(next);
                 }
             }
@@ -228,8 +223,8 @@ public class EquationList
     private bool _global_pending = false;
 
     public bool TryTakeEnumerationGroup(
-        [NotNullWhen(true)] out HashSet<Equation>? equations, 
-        [NotNullWhen(true)] out HashSet<Point<int>>? cells)
+        [NotNullWhen(true)] out HashSet<Equation>? equations,
+        [NotNullWhen(true)] out HashSet<int>? cells)
     {
         Equation equation;
 
@@ -252,8 +247,8 @@ public class EquationList
     }
 
     public bool TryTakeGlobalGroup(
-        [NotNullWhen(true)] out HashSet<Equation>? equations, 
-        [NotNullWhen(true)] out HashSet<Point<int>>? cells)
+        [NotNullWhen(true)] out HashSet<Equation>? equations,
+        [NotNullWhen(true)] out HashSet<int>? cells)
     {
         if (_global_pending && _global is not null)
         {

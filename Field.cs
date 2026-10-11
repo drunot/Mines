@@ -30,7 +30,13 @@ public class Field
         _pos = new Point<int>(own_x, own_y);
         _parent = parent;
         _is_bomb = is_bomb;
+        _index = own_x * parent.Columns + own_y;
     }
+
+    // A single number for this cell (row * Columns + column); the solver uses it instead of Position.
+    public int Index => _index;
+
+    private readonly int _index;
     private FieldMatrix _parent;
 
     public FieldMatrix Parent

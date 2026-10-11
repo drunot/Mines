@@ -8,15 +8,18 @@ abstract class SolvingStrategyBase : ISolvingStrategy
 {
 
     public abstract bool ApplyStrategy(FieldMatrix fieldMatrix, EquationList equations);
-    protected static List<Equation> createEquations(FieldMatrix fieldMatrix, Point<int> location, HashSet<Point<int>> points)
+
+    // Equations for a revealed cell, and for every cell its cascade revealed: the walk continues
+    // through cells without neighbouring bombs. Visited cells are collected in `cells`.
+    protected static List<Equation> createEquations(FieldMatrix fieldMatrix, int location, HashSet<int> cells)
     {
         var equations = new List<Equation>();
-        var to_visit = new Stack<Point<int>>();
+        var to_visit = new Stack<int>();
         to_visit.Push(location);
-        while (to_visit.TryPop(out Point<int>? current))
+        while (to_visit.TryPop(out int current))
         {
-            Field field = fieldMatrix[current.X, current.Y];
-            if (field.Hidden || !points.Add(current))
+            Field field = fieldMatrix.FieldAt(current);
+            if (field.Hidden || !cells.Add(current))
             {
                 continue;
             }
@@ -27,7 +30,7 @@ abstract class SolvingStrategyBase : ISolvingStrategy
             {
                 if (neighbor.Hidden && !neighbor.Flagged)
                 {
-                    equation.variables.Add(neighbor.Position);
+                    equation.Add(neighbor.Index);
                 }
                 if (neighbor.IsBomb)
                 {
@@ -38,7 +41,7 @@ abstract class SolvingStrategyBase : ISolvingStrategy
 
             if (number != 0)
             {
-                if (equation.variables.Count != 0)
+                if (equation.Count != 0)
                 {
                     equations.Add(equation);
                 }
@@ -46,31 +49,36 @@ abstract class SolvingStrategyBase : ISolvingStrategy
             }
             foreach (Field neighbor in field.Neighbors)
             {
-                to_visit.Push(neighbor.Position);
+                to_visit.Push(neighbor.Index);
             }
         }
         return equations;
     }
 
-    protected void Flag(FieldMatrix fieldMatrix, EquationList equations, Point<int> point)
+    protected void Flag(FieldMatrix fieldMatrix, EquationList equations, int cell)
     {
-        fieldMatrix[point.X, point.Y].Flagged = true;
-        equations.MarkBomb(point);
+        fieldMatrix.FieldAt(cell).Flagged = true;
+        equations.MarkBomb(cell);
     }
 
-    protected void Reveal(FieldMatrix fieldMatrix, EquationList equations, Point<int> point)
+    protected void Reveal(FieldMatrix fieldMatrix, EquationList equations, int cell)
     {
-        fieldMatrix[point.X, point.Y].Hidden = false;
+        Field field = fieldMatrix.FieldAt(cell);
+        if (!field.Hidden)
+        {
+            return;   // already revealed by an earlier cascade, which created its equations too
+        }
+        field.Hidden = false;
 
-        var revealed_points = new HashSet<Point<int>>();
-        foreach (Equation new_equation in createEquations(fieldMatrix, point, revealed_points))
+        var revealed_cells = new HashSet<int>();
+        foreach (Equation new_equation in createEquations(fieldMatrix, cell, revealed_cells))
         {
             equations.Add(new_equation);
         }
-        foreach (Point<int> revealed in revealed_points)
+        foreach (int revealed in revealed_cells)
         {
             equations.MarkSafe(revealed);
         }
-        equations.MarkSafe(point);
+        equations.MarkSafe(cell);
     }
 }

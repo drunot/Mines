@@ -11,18 +11,18 @@ class NeighborStrategy : SolvingStrategyBase
         // Could still probably be one.
         if (equations.TryTakeChanged(Rule.Neighbor, out Equation equation))
         {
-            if (equation.variables.Count == equation.sum)
+            if (equation.Count == equation.sum)
             {
-                foreach (Point<int> variable in equation.variables.ToArray())   // copy: MarkBomb changes this set
+                foreach (int cell in equation.ToArray())   // copy: MarkBomb changes this equation
                 {
-                    Flag(fieldMatrix, equations, variable);
+                    Flag(fieldMatrix, equations, cell);
                 }
             }
             else if (equation.sum == 0)
             {
-                foreach (Point<int> variable in equation.variables.ToArray())
+                foreach (int cell in equation.ToArray())
                 {
-                    Reveal(fieldMatrix, equations, variable);
+                    Reveal(fieldMatrix, equations, cell);
                 }
             }
             return true;

@@ -147,6 +147,9 @@ public class FieldMatrix
         get => _fields[row, column];
     }
 
+    // The field with the given Field.Index (row * Columns + column).
+    public Field FieldAt(int index) => _fields[index / _columns, index % _columns];
+
     public Field[,] Fields
     {
         get => _fields;
