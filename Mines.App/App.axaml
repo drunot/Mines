@@ -1,5 +1,6 @@
 <Application xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="using:Mines"
              x:Class="Mines.App"
              RequestedThemeVariant="Default">
     <!-- "Default" ThemeVariant follows system theme variant. "Dark" or "Light" are other available options. -->
@@ -28,6 +29,11 @@
                     <SolidColorBrush x:Key="FlagClothBrush" Color="#FF3C00"/>
                     <SolidColorBrush x:Key="BombIconBrush" Color="#333333"/>
                     <SolidColorBrush x:Key="QuestionIconBrush" Color="#333333"/>
+                    <SolidColorBrush x:Key="CogIconBrush" Color="#333333"/>
+                    <SolidColorBrush x:Key="FaceBrush" Color="#F8F800"/>
+                    <SolidColorBrush x:Key="FaceLineBrush" Color="#333333"/>
+                    <SolidColorBrush x:Key="SegmentOnBrush" Color="#FF0000"/>
+                    <SolidColorBrush x:Key="SegmentOffBrush" Color="#2B0000"/>
                 </ResourceDictionary>
                 <ResourceDictionary x:Key="Dark">
                     <SolidColorBrush x:Key="BombBrush" Color="#621414"/>
@@ -51,6 +57,11 @@
                     <SolidColorBrush x:Key="FlagClothBrush" Color="#FF3C00"/>
                     <SolidColorBrush x:Key="BombIconBrush" Color="#DDDDDD"/>
                     <SolidColorBrush x:Key="QuestionIconBrush" Color="#DDDDDD"/>
+                    <SolidColorBrush x:Key="CogIconBrush" Color="#DDDDDD"/>
+                    <SolidColorBrush x:Key="FaceBrush" Color="#F8F800"/>
+                    <SolidColorBrush x:Key="FaceLineBrush" Color="#333333"/>
+                    <SolidColorBrush x:Key="SegmentOnBrush" Color="#FF0000"/>
+                    <SolidColorBrush x:Key="SegmentOffBrush" Color="#2B0000"/>
                 </ResourceDictionary>
             </ResourceDictionary.ThemeDictionaries>
         </ResourceDictionary>
@@ -62,6 +73,36 @@
         </Style>
         <Style Selector="Button /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Background" Value="{DynamicResource ClearBrush}"/>
+        </Style>
+
+        <!-- Text buttons styled like the tiles: <Button Classes="tile">. Raised bevel on the hidden-cell
+             colour, hover colours while the mouse is over it, and a slight shrink while pressed. -->
+        <Style Selector="Button.tile">
+            <Setter Property="Background" Value="{DynamicResource HiddenBrush}"/>
+            <Setter Property="Padding" Value="10,4"/>
+            <Setter Property="RenderTransform" Value="none"/>
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <Border Background="{TemplateBinding Background}" CornerRadius="1">
+                        <local:BevelFrame Name="PART_Bevel" IsRaised="True">
+                            <ContentPresenter Name="PART_TileContent"
+                                              Content="{TemplateBinding Content}"
+                                              Padding="{TemplateBinding Padding}"
+                                              HorizontalContentAlignment="Center"
+                                              VerticalContentAlignment="Center"/>
+                        </local:BevelFrame>
+                    </Border>
+                </ControlTemplate>
+            </Setter>
+        </Style>
+        <Style Selector="Button.tile:pointerover">
+            <Setter Property="Background" Value="{DynamicResource HoverBrush}"/>
+        </Style>
+        <Style Selector="Button.tile:pointerover /template/ local|BevelFrame#PART_Bevel">
+            <Setter Property="IsHighlighted" Value="True"/>
+        </Style>
+        <Style Selector="Button.tile:pressed">
+            <Setter Property="RenderTransform" Value="scale(0.98)"/>
         </Style>
     </Application.Styles>
 </Application>

@@ -5,8 +5,8 @@
         xmlns:local="using:Mines"
         mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
         x:Class="Mines.MainWindow"
-        Title="Mines">
-    <local:Minefield Rows="15" Columns="25"
-                     HorizontalAlignment="Center"
-                     VerticalAlignment="Center"/>
+        Title="Mines"
+        Background="{DynamicResource HiddenBrush}">
+    <!-- Rows and Columns are the defaults for the first start; after that the saved settings are used. -->
+    <local:Minefield x:Name="Game" Rows="15" Columns="25"/>
 </Window>

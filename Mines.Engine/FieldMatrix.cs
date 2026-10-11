@@ -152,6 +152,9 @@ public class FieldMatrix
 
     bool _initialized = false;
 
+    // True once the bombs are placed: right away for a given layout, or on the first reveal with a generator.
+    public bool Initialized => _initialized;
+
     public void Initialize(Point<int> first_point)
     {
         if (_initialized)
