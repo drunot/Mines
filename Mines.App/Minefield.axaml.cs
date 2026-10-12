@@ -143,7 +143,7 @@ public partial class Minefield : UserControl
         }
         IMatrixGenerator generator = Generator == GeneratorKind.Classic
             ? new ClassicRandomGenerator()
-            : new DeterministicGenerator();
+            : new FastDeterministicGenerator();
         _fieldMatrix = new FieldMatrix(Rows, Columns, BombCount, generator);
         _fieldMatrix.FieldChanged += OnBoardChanged;
         BoardView.Board = _fieldMatrix;
@@ -262,9 +262,9 @@ public partial class Minefield : UserControl
     }
 
     /// <summary>
-    /// Shows the elapsed time, in whole seconds, on the time counter.
+    /// Shows the elapsed time, in whole seconds, on the clock (hh:mm:ss).
     /// </summary>
-    private void ShowTime() => TimeCounter.Value = (int)Math.Min(int.MaxValue, Elapsed.TotalSeconds);
+    private void ShowTime() => TimeCounter.Seconds = (int)Math.Min(int.MaxValue, Elapsed.TotalSeconds);
 
     // ---- Saving and loading (SavedState): the settings, and the board if a game was left unfinished ----
 

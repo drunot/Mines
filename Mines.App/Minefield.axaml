@@ -22,7 +22,7 @@
                    Placement="BottomEdgeAlignedRight" VerticalOffset="4" IsLightDismissEnabled="True">
               <local:SettingsPanel x:Name="SettingsPanel"/>
             </Popup>
-            <local:SegmentCounter x:Name="TimeCounter" VerticalAlignment="Center"/>
+            <local:SegmentClock x:Name="TimeCounter" VerticalAlignment="Center"/>
           </StackPanel>
         </Grid>
       </local:BevelFrame>

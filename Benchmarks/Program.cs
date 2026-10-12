@@ -3,7 +3,8 @@
 //   dotnet run -c Release -- --filter '*SolverBench*'      only the solvers
 //   dotnet run -c Release -- --filter '*GeneratorBench*'   only board generation (see GeneratorBench.cs)
 //   dotnet run -c Release -- check                         compare every solver with NeighborSolver
-//   dotnet run -c Release -- gencheck                      time board generation and validate every board
+//   dotnet run -c Release -- gencheck [factor]             time board generation and validate every board
+//                                                          (factor multiplies the number of boards, default 1)
 //
 // Boards are generated from fixed seeds, so every run and every benchmark solves the same
 // boards and results stay comparable while optimizing. Correctness is covered by ../Tests.
@@ -131,9 +132,11 @@ public static class Program
         }
         if (args.Length > 0 && args[0] == "gencheck")
         {
-            GeneratorCheck.Run("9x16/20", 200, TimeSpan.FromSeconds(30));
-            GeneratorCheck.Run("16x30/99", 100, TimeSpan.FromSeconds(30));
-            GeneratorCheck.Run("100x100/2000", 10, TimeSpan.FromSeconds(120));
+            // Optional multiplier for the number of boards, e.g. "gencheck 20" for a longer soak test.
+            int factor = args.Length > 1 && int.TryParse(args[1], out int f) && f > 0 ? f : 1;
+            GeneratorCheck.Run("9x16/20", 200 * factor, TimeSpan.FromSeconds(30));
+            GeneratorCheck.Run("16x30/99", 100 * factor, TimeSpan.FromSeconds(30));
+            GeneratorCheck.Run("100x100/2000", 10 * factor, TimeSpan.FromSeconds(120));
             return;
         }
         BenchmarkSwitcher.FromTypes(new[] { typeof(SolverBench), typeof(GeneratorBench) }).Run(args);

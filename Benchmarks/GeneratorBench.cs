@@ -1,4 +1,4 @@
-// No-guess board generation: DeterministicGenerator (solver + EdgeBoardFixer).
+// No-guess board generation: DeterministicGenerator and FastDeterministicGenerator (solver + EdgeBoardFixer).
 // Board i is always generated with new Random(i) and the first click in the centre, so every
 // run generates the same boards and results stay comparable while optimizing.
 
@@ -16,6 +16,9 @@ public class GeneratorBench
 {
     [Params("9x16/20", "16x30/99", "100x100/2000")]
     public string Board = "";
+
+    [Params(nameof(DeterministicGenerator), nameof(FastDeterministicGenerator))]
+    public string Generator = "";
 
     private int _rows;
     private int _columns;
@@ -36,7 +39,7 @@ public class GeneratorBench
         int result = 0;
         for (int seed = 0; seed < _count; ++seed)
         {
-            bool[,] bombs = GeneratorCheck.Generate(_rows, _columns, _bombs, seed);
+            bool[,] bombs = GeneratorCheck.Generate(Generator, _rows, _columns, _bombs, seed);
             result += bombs.Length;
         }
         return result;
@@ -50,14 +53,29 @@ public static class GeneratorCheck
 
     public static Point<int> FirstClick(int rows, int columns) => new Point<int>(rows / 2, columns / 2);
 
-    public static bool[,] Generate(int rows, int columns, int bombs, int seed)
+    // The generators to compare, by name.
+    public static readonly (string Name, Func<Random, IMatrixGenerator> Create)[] Generators =
     {
-        var generator = new DeterministicGenerator(new Random(seed));
+        (nameof(DeterministicGenerator), random => new DeterministicGenerator(random)),
+        (nameof(FastDeterministicGenerator), random => new FastDeterministicGenerator(random)),
+    };
+
+    public static bool[,] Generate(string generator_name, int rows, int columns, int bombs, int seed)
+    {
+        IMatrixGenerator generator = Generators.Single(g => g.Name == generator_name).Create(new Random(seed));
         return generator.Generate(rows, columns, FirstClick(rows, columns), bombs);
     }
 
-    // Generates boards one by one, times each, and checks that every board is valid.
+    // Generates boards one by one with each generator, times each, and checks that every board is valid.
     public static void Run(string board, int count, TimeSpan time_limit)
+    {
+        foreach (var (name, _) in Generators)
+        {
+            Run(name, board, count, time_limit);
+        }
+    }
+
+    private static void Run(string generator_name, string board, int count, TimeSpan time_limit)
     {
         var (rows, columns, bomb_count) = Boards.Parse(board);
         Point<int> first = FirstClick(rows, columns);
@@ -67,10 +85,10 @@ public static class GeneratorCheck
         for (int seed = 0; seed < count; ++seed)
         {
             var watch = Stopwatch.StartNew();
-            Task<bool[,]> task = Task.Run(() => Generate(rows, columns, bomb_count, seed));
+            Task<bool[,]> task = Task.Run(() => Generate(generator_name, rows, columns, bomb_count, seed));
             if (!task.Wait(time_limit))
             {
-                Console.WriteLine($"  {board} seed {seed}: no board after {time_limit.TotalSeconds:F0} s, stopping");
+                Console.WriteLine($"  {generator_name} {board} seed {seed}: no board after {time_limit.TotalSeconds:F0} s, stopping");
                 Environment.Exit(1);
             }
             times.Add(watch.Elapsed.TotalMilliseconds);
@@ -91,7 +109,7 @@ public static class GeneratorCheck
         }
 
         times.Sort();
-        Console.WriteLine($"{board}: {count} boards, per board: mean {times.Average():F1} ms, "
+        Console.WriteLine($"{generator_name} {board}: {count} boards, per board: mean {times.Average():F1} ms, "
             + $"median {times[times.Count / 2]:F1} ms, max {times[^1]:F1} ms | "
             + $"wrong bomb count {wrong_count}, bomb in start area {start_not_free}, "
             + $"not solvable by ConstraintSolver {not_solvable}");

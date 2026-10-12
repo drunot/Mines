@@ -2,6 +2,9 @@
   <Folder Name="/Benchmarks/">
     <Project Path="Benchmarks/Mines.Benchmarks.csproj" />
   </Folder>
+  <Folder Name="/BruteForce/">
+    <Project Path="BruteForce/Mines.BruteForce.csproj" />
+  </Folder>
   <Folder Name="/Tests/">
     <Project Path="Tests/Mines.Tests.csproj" />
   </Folder>

@@ -8,7 +8,7 @@ namespace Mines;
 /// </summary>
 public enum GeneratorKind
 {
-    /// <summary>Uses <c>DeterministicGenerator</c>: boards are always solvable by logic.</summary>
+    /// <summary>Uses <c>FastDeterministicGenerator</c>: boards are always solvable by logic.</summary>
     NoGuessing,
     /// <summary>Uses <c>ClassicRandomGenerator</c>: random boards that may need a guess.</summary>
     Classic,

@@ -14,7 +14,7 @@ namespace Mines.Solving;
 /// <see cref="EnumerationStrategy"/> as a last resort; whenever a later step changes something it goes
 /// back to the first. Stops when none of them can make progress.
 /// </remarks>
-public class ConstraintSolver : ISolver
+public class ConstraintSolver : IResumableSolver
 {
     /// <summary>
     /// Builds an equation for every revealed field: its hidden, unflagged neighbours add up to the number
@@ -70,6 +70,7 @@ public class ConstraintSolver : ISolver
     };
 
 
+
     /// <summary>
     /// Reveals and flags every field that can be deduced without guessing. Changes
     /// <paramref name="fieldMatrix"/> in place.
@@ -77,19 +78,35 @@ public class ConstraintSolver : ISolver
     /// <param name="fieldMatrix">The board to solve; at least one field should already be revealed.</param>
     public void Solve(FieldMatrix fieldMatrix)
     {
-        var equations = CollectEquations(fieldMatrix);
+        _matrix = fieldMatrix;
+        _equations = CollectEquations(_matrix);
+        Solve();
+    }
+
+
+    /// <summary>
+    /// Runs the strategies on <see cref="_matrix"/> with <see cref="_equations"/> until none of them makes
+    /// progress.
+    /// </summary>
+    void Solve()
+    {
+        if (_matrix is null || _equations is null)
+        {
+            return;
+        }
+
 
         SolverStates states = SolverStates.NeighborSolver;
         while (true)
         {
-            equations.TryCreateGlobalEquation();
+            _equations.TryCreateGlobalEquation();
 
             switch (states)
             {
                 // Step 1: Simple neighbor solver.
                 case SolverStates.NeighborSolver:
                     {
-                        bool board_changed = solvingStrategies[SolverStates.NeighborSolver].ApplyStrategy(fieldMatrix, equations);
+                        bool board_changed = solvingStrategies[SolverStates.NeighborSolver].ApplyStrategy(_matrix, _equations);
                         if (!board_changed)
                         {
                             states = SolverStates.SubsetSolver;
@@ -99,7 +116,7 @@ public class ConstraintSolver : ISolver
                 // Step 2: Simpler the full constraint check. (Subset check.)
                 case SolverStates.SubsetSolver:
                     {
-                        bool board_changed = solvingStrategies[SolverStates.SubsetSolver].ApplyStrategy(fieldMatrix, equations);
+                        bool board_changed = solvingStrategies[SolverStates.SubsetSolver].ApplyStrategy(_matrix, _equations);
                         if (!board_changed)
                         {
                             states = SolverStates.EnumerationSolver;
@@ -113,7 +130,7 @@ public class ConstraintSolver : ISolver
                 // Step 3: Enumeration Solver. The most involved and last resort.
                 case SolverStates.EnumerationSolver:
                     {
-                        bool board_changed = solvingStrategies[SolverStates.EnumerationSolver].ApplyStrategy(fieldMatrix, equations);
+                        bool board_changed = solvingStrategies[SolverStates.EnumerationSolver].ApplyStrategy(_matrix, _equations);
                         if (!board_changed)
                         {
                             states = SolverStates.Exit;
@@ -131,4 +148,32 @@ public class ConstraintSolver : ISolver
             }
         }
     }
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// The swaps change revealed numbers, so all equations are rebuilt from the board as it is now (what a
+    /// player would see) rather than patched. Does nothing if <see cref="Solve(FieldMatrix)"/> hasn't been
+    /// called yet.
+    /// </remarks>
+    public void SwapAndContinue(List<(Point<int>, Point<int>)> swaps)
+    {
+        if (_matrix is null || _equations is null)
+        {
+            return;
+        }
+
+        foreach (var swap in swaps)
+        {
+            _matrix.SwapBombs(swap.Item1, swap.Item2);
+        }
+        _equations = CollectEquations(_matrix);
+        Solve();
+    }
+
+    /// <summary>The board of the last <see cref="Solve(FieldMatrix)"/> call; <c>null</c> before the first.</summary>
+    private FieldMatrix? _matrix;
+    /// <summary>The equations for <see cref="_matrix"/>; <c>null</c> before the first solve.</summary>
+    private EquationList? _equations;
+
+
 }

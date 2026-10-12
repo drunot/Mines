@@ -144,10 +144,11 @@ public class EdgeBoardFixer : iBoardFixer
 
     /// <inheritdoc/>
     /// <remarks>
-    /// Swaps bombs with hidden fields whose neighbours are all hidden, so the revealed part of the board
-    /// stays consistent. Changes the bombs of <paramref name="board"/> itself as well.
+    /// Swaps bombs with hidden fields whose neighbours are all hidden, so no revealed number away from the
+    /// chosen edge changes. Returns <c>false</c> if no revealed number can be fixed, or if there aren't enough
+    /// such hidden fields.
     /// </remarks>
-    public bool FixBoard(FieldMatrix board, [NotNullWhen(true)] out bool[,]? fixed_board)
+    public bool GetBoardChanges(FieldMatrix board, [NotNullWhen(true)] out List<(Point<int>, Point<int>)>? swaps)
     {
         List<FieldCandidate> candidates = new List<FieldCandidate>();
         foreach (Field f in board.Fields)
@@ -157,12 +158,19 @@ public class EdgeBoardFixer : iBoardFixer
                 candidates.Add(new FieldCandidate(f));
             }
         }
+
+        // If no candidates was found no fixes can be applied.
+        if(candidates.Count == 0)
+        {
+            swaps = null;
+            return false;
+        }
         candidates.Sort((f1, f2) => f1.SelectionScore.CompareTo(f2.SelectionScore));
         var best_candidate = candidates.First();
 
         if (best_candidate.SelectionScore == FieldCandidate.ErrorScore)
         {
-            fixed_board = null;
+            swaps = null;
             return false;
         }
 
@@ -180,9 +188,10 @@ public class EdgeBoardFixer : iBoardFixer
             if (available_fields.Count < best_candidate.BombsInExcess)
             {
                 // TODO: Attempt the best take candidate before giving up.
-                fixed_board = null;
+                swaps = null;
                 return false;
             }
+            swaps = new List<(Point<int>, Point<int>)>();
 
             Field[] fields_shuffled = available_fields.ToArray();
             _rand.Shuffle(fields_shuffled);
@@ -194,8 +203,9 @@ public class EdgeBoardFixer : iBoardFixer
                 {
                     continue;
                 }
-                board.SwapBombs(fields_shuffled[i++].Position, fn.Position);
+                swaps.Add((fields_shuffled[i++].Position, fn.Position));
             }
+            return true;
         }
         else
         {
@@ -210,9 +220,10 @@ public class EdgeBoardFixer : iBoardFixer
             if (available_fields.Count < best_candidate.BombsMissing)
             {
                 // TODO: Attempt the best give candidate before giving up.
-                fixed_board = null;
+                swaps = null;
                 return false;
             }
+            swaps = new List<(Point<int>, Point<int>)>();
 
             Field[] fields_shuffled = available_fields.ToArray();
             _rand.Shuffle(fields_shuffled);
@@ -224,17 +235,38 @@ public class EdgeBoardFixer : iBoardFixer
                 {
                     continue;
                 }
-                board.SwapBombs(fields_shuffled[i++].Position, fn.Position);
+                swaps.Add((fields_shuffled[i++].Position, fn.Position));
             }
+            return true;
         }
-        fixed_board = new bool[board.Rows, board.Columns];
-        for (int x = 0; x < board.Rows; ++x)
-        {
-            for (int y = 0; y < board.Columns; ++y)
-            {
-                fixed_board[x, y] = board.Fields[x, y].IsBomb;
-            }
-        }
-        return true;
     }
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Applies the swaps from <see cref="GetBoardChanges"/> to <paramref name="board"/> itself, then returns
+    /// its new layout.
+    /// </remarks>
+    public bool FixBoard(FieldMatrix board, [NotNullWhen(true)] out bool[,]? fixed_board)
+    {
+        if (GetBoardChanges(board, out var swaps))
+        {
+            foreach (var swap in swaps)
+            {
+                board.SwapBombs(swap.Item1, swap.Item2);
+            }
+
+            fixed_board = new bool[board.Rows, board.Columns];
+            for (int x = 0; x < board.Rows; ++x)
+            {
+                for (int y = 0; y < board.Columns; ++y)
+                {
+                    fixed_board[x, y] = board.Fields[x, y].IsBomb;
+                }
+            }
+            return true;
+        }
+        fixed_board = null;
+        return false;
+    }
+
 }
