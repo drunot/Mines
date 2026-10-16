@@ -15,7 +15,7 @@ $ dotnet run
 
 Copyright Anton Vigen Smolarz (anton@smolarz.dk).
 
-The program on the repository is under GPLv3.0 license.
+The program on the repository is under AGPLv3.0 license.
 
 Images in [Mines.App/resources](Mines.App/resources) are also copyright Anton Vigen Smolarz (anton@smolarz.dk) and under Creative Commons license (CC BY-NC-SA 4.0).
 
