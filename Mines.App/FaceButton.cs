@@ -37,5 +37,5 @@ public class FaceButton : TileButton
     /// <param name="context">The drawing context, in tile units.</param>
     /// <param name="palette">The theme brushes to draw with.</param>
     private protected override void DrawIcon(DrawingContext context, TilePalette palette) =>
-        TileShapes.DrawIcon(context, () => TileShapes.DrawFace(context, palette, Face), apply_svg_offset: false);
+        TileShapes.DrawIcon(context, () => TileShapes.DrawFace(context, palette, Face), applySvgOffset: false);
 }

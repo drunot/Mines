@@ -2,10 +2,8 @@ using System;
 using Mines.Solving;
 using System.Linq;
 using Mines.BoardFixer;
-using System.Diagnostics.CodeAnalysis;
 
 namespace Mines.Generators;
-
 
 /// <summary>
 /// Generates boards that can be solved without guessing from the first reveal. A faster version of
@@ -16,14 +14,14 @@ namespace Mines.Generators;
 /// Places bombs at random outside the 3x3 area around the first reveal, then runs
 /// <see cref="ConstraintSolver"/>. If the board can't be solved, <see cref="EdgeBoardFixer"/> moves
 /// bombs and the solver continues from where it got stuck (<see cref="IResumableSolver.SwapAndContinue"/>),
-/// up to <see cref="fix_attempts"/> times; after that, or if the fixer fails, it starts over with a new
+/// up to <see cref="FixAttempts"/> times; after that, or if the fixer fails, it starts over with a new
 /// random board.
 /// </para>
 /// <para>
 /// Continuing keeps the cells revealed and flagged before a swap, but some of them were deduced from numbers
-/// the swap changed, so the result isn't always solvable from the first click (the BruteForce project finds
-/// such boards). A board fixed this way is therefore solved once more from the first click before it is
-/// returned; if that gets stuck, fixing continues from that fresh position, which a player can reach.
+/// the swap changed, so the result isn't always solvable from the first click. A board fixed this way is
+/// therefore solved once more from the first click before it is returned; if that gets stuck, fixing
+/// continues from that fresh position, which a player can reach.
 /// A board that needed no fixing was already solved from the first click and is returned straight away.
 /// </para>
 /// </remarks>
@@ -33,7 +31,9 @@ public class FastDeterministicGenerator : IMatrixGenerator
     /// <summary>
     /// Creates the generator.
     /// </summary>
-    /// <param name="random">The random number source, also used by the board fixer; a new <see cref="Random"/> if <c>null</c>.</param>
+    /// <param name="random">
+    /// The random number source, also used by the board fixer; a new <see cref="Random"/> if <c>null</c>.
+    /// </param>
     public FastDeterministicGenerator(Random? random = null)
     {
         _rand = random ?? new Random();
@@ -46,20 +46,20 @@ public class FastDeterministicGenerator : IMatrixGenerator
     /// <summary>Checks whether a generated board can be solved without guessing.</summary>
     IResumableSolver _solver = new ConstraintSolver();
     /// <summary>Moves bombs on boards the solver got stuck on.</summary>
-    iBoardFixer _fixer;
+    IBoardFixer _fixer;
 
     /// <summary>
-    /// Whether <paramref name="position"/> is within the 3x3 area around <paramref name="first_reveal"/>.
+    /// Whether <paramref name="position"/> is within the 3x3 area around <paramref name="firstReveal"/>.
     /// </summary>
-    /// <param name="first_reveal">The first revealed field.</param>
+    /// <param name="firstReveal">The first revealed field.</param>
     /// <param name="position">The position to test.</param>
     /// <returns><c>true</c> if the position is in the start area.</returns>
-    bool WithinStart(Point<int> first_reveal, Point<int> position)
+    bool WithinStart(Point<int> firstReveal, Point<int> position)
     {
-        if (position.X >= first_reveal.X - 1 &&
-           position.X <= first_reveal.X + 1 &&
-           position.Y >= first_reveal.Y - 1 &&
-           position.Y <= first_reveal.Y + 1)
+        if (position.X >= firstReveal.X - 1 &&
+           position.X <= firstReveal.X + 1 &&
+           position.Y >= firstReveal.Y - 1 &&
+           position.Y <= firstReveal.Y + 1)
         {
             return true;
         }
@@ -67,22 +67,24 @@ public class FastDeterministicGenerator : IMatrixGenerator
     }
 
     /// <summary>How many times a board is fixed and solved again before starting over.</summary>
-    const int fix_attempts = 40;
+    const int FixAttempts = 40;
 
     /// <summary>
     /// Copies the bomb layout of <paramref name="matrix"/> into <paramref name="bombs"/>.
     /// </summary>
     /// <param name="matrix">The board to read.</param>
-    /// <param name="bombs">Receives the layout; <c>[row, column]</c> is true for a bomb. Must have the board's size.</param>
-    private static void GetBombs(FieldMatrix matrix, bool[,] bombs )
+    /// <param name="bombs">
+    /// Receives the layout; <c>[row, column]</c> is true for a bomb. Must have the board's size.
+    /// </param>
+    private static void GetBombs(FieldMatrix matrix, bool[,] bombs)
     {
-            for (int x = 0; x < matrix.Rows; ++x)
+        for (int x = 0; x < matrix.Rows; ++x)
+        {
+            for (int y = 0; y < matrix.Columns; ++y)
             {
-                for (int y = 0; y < matrix.Columns; ++y)
-                {
-                    bombs[x, y] = matrix.Fields[x, y].IsBomb;
-                }
+                bombs[x, y] = matrix.Fields[x, y].IsBomb;
             }
+        }
     }
 
     /// <summary>
@@ -94,12 +96,12 @@ public class FastDeterministicGenerator : IMatrixGenerator
     /// can continue from it if the check fails.
     /// </param>
     /// <param name="bombs">Receives the layout if the check succeeds.</param>
-    /// <param name="first_reveal">The first revealed field.</param>
+    /// <param name="firstReveal">The first revealed field.</param>
     /// <returns><c>true</c> if the fresh board was solved completely.</returns>
-    private bool TryVerify(ref FieldMatrix matrix, bool[,] bombs, Point<int> first_reveal)
+    private bool TryVerify(ref FieldMatrix matrix, bool[,] bombs, Point<int> firstReveal)
     {
         matrix = new FieldMatrix(matrix);
-        matrix[first_reveal.X, first_reveal.Y].Hidden = false;
+        matrix[firstReveal.X, firstReveal.Y].Hidden = false;
         _solver.Solve(matrix);
 
         if (matrix.GameWon)
@@ -111,54 +113,55 @@ public class FastDeterministicGenerator : IMatrixGenerator
     }
 
     /// <inheritdoc/>
-    /// <exception cref="ArgumentException">There are not enough cells outside the start area for <paramref name="bomb_count"/> bombs.</exception>
-    public void Generate(FieldMatrix filedMatrix, Point<int> first_reveal, int bomb_count)
+    /// <exception cref="ArgumentException">
+    /// There are not enough cells outside the start area for <paramref name="bombCount"/> bombs.
+    /// </exception>
+    public void Generate(FieldMatrix fieldMatrix, Point<int> firstReveal, int bombCount)
     {
         while (true)
         {
-            var bombs = new bool[filedMatrix.Rows, filedMatrix.Columns];
+            var bombs = new bool[fieldMatrix.Rows, fieldMatrix.Columns];
 
-            int[] cells = Enumerable.Range(0, filedMatrix.Rows * filedMatrix.Columns).ToArray();
+            int[] cells = Enumerable.Range(0, fieldMatrix.Rows * fieldMatrix.Columns).ToArray();
             _rand.Shuffle(cells);
             int placed = 0;
-            for (int j = 0; j < cells.Length && placed < bomb_count; ++j)
+            for (int j = 0; j < cells.Length && placed < bombCount; ++j)
             {
-                var point = new Point<int>(cells[j] / filedMatrix.Columns, cells[j] % filedMatrix.Columns);
-                if (WithinStart(first_reveal, point))
+                var point = new Point<int>(cells[j] / fieldMatrix.Columns, cells[j] % fieldMatrix.Columns);
+                if (WithinStart(firstReveal, point))
                 {
                     continue;   // keep the start area free; try the next cell
                 }
                 bombs[point.X, point.Y] = true;
                 ++placed;
             }
-            if (placed < bomb_count)
+            if (placed < bombCount)
             {
                 throw new ArgumentException("Not enough cells outside the start area for that many bombs.");
             }
 
             var matrix = new FieldMatrix(bombs);
-            matrix[first_reveal.X, first_reveal.Y].Hidden = false;
+            matrix[firstReveal.X, firstReveal.Y].Hidden = false;
             _solver.Solve(matrix);
 
             if (matrix.GameWon)
             {
                 GetBombs(matrix, bombs);
 
-                filedMatrix.ApplyBombs(bombs);
+                fieldMatrix.ApplyBombs(bombs);
                 return;
             }
-            for (int i = 0; i < fix_attempts; i++)
+            for (int i = 0; i < FixAttempts; i++)
             {
 
                 if (matrix.GameWon)
                 {
-                    if (TryVerify(ref matrix, bombs, first_reveal))
+                    if (TryVerify(ref matrix, bombs, firstReveal))
                     {
-                        filedMatrix.ApplyBombs(bombs);
+                        fieldMatrix.ApplyBombs(bombs);
                         return;
                     }
                 }
-
 
                 if (_fixer.GetBoardChanges(matrix, out var changes))
                 {
@@ -173,12 +176,11 @@ public class FastDeterministicGenerator : IMatrixGenerator
             if (matrix.GameWon)
             {
 
-
                 // Ensure that the game is solvable.
                 // The fast solver can create boards in rare cases that aren't.
-                if (TryVerify(ref matrix, bombs, first_reveal))
+                if (TryVerify(ref matrix, bombs, firstReveal))
                 {
-                    filedMatrix.ApplyBombs(bombs);
+                    fieldMatrix.ApplyBombs(bombs);
                     return;
                 }
             }

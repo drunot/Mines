@@ -1,10 +1,10 @@
 using System.Collections.Generic;
-using System.Linq;
-using Mines;
 using Mines.Solving;
 
 namespace Mines.Tests;
 
+// The solvers (NeighborSolver and ConstraintSolver): they never make a wrong move, ConstraintSolver finds at
+// least what NeighborSolver finds, and small hand-made boards show what each one can solve.
 public class SolverTests
 {
     // Seeded random boards: (rows, columns, bombs, seed). Same boards on every run.
@@ -20,10 +20,11 @@ public class SolverTests
         }
     }
 
+    // The simplest deduction: a 1 with a single hidden neighbour.
     [Theory]
     [InlineData(nameof(NeighborSolver))]
     [InlineData(nameof(ConstraintSolver))]
-    public void Flags_the_only_bomb(string solver_name)
+    public void Flags_the_only_bomb(string solverName)
     {
         FieldMatrix matrix = Boards.FromText(
             "*..",
@@ -31,7 +32,7 @@ public class SolverTests
             "...");
         matrix[2, 2].Hidden = false;
 
-        Boards.Solver(solver_name).Solve(matrix);
+        Boards.Solver(solverName).Solve(matrix);
 
         Assert.True(matrix[0, 0].Flagged);
         Assert.True(Boards.IsSolved(matrix));
@@ -41,7 +42,7 @@ public class SolverTests
     [Theory]
     [InlineData(nameof(NeighborSolver))]
     [InlineData(nameof(ConstraintSolver))]
-    public void Never_makes_a_wrong_move(string solver_name)
+    public void Never_makes_a_wrong_move(string solverName)
     {
         foreach (object[] board in RandomBoards())
         {
@@ -54,7 +55,7 @@ public class SolverTests
             }
             start.Hidden = false;
 
-            Boards.Solver(solver_name).Solve(matrix);
+            Boards.Solver(solverName).Solve(matrix);
 
             foreach (Field f in Boards.All(matrix))
             {
@@ -65,10 +66,10 @@ public class SolverTests
         }
     }
 
-    // The constraint solvers must find at least everything NeighborSolver finds.
+    // ConstraintSolver must find at least everything NeighborSolver finds on the same boards.
     [Theory]
     [InlineData(nameof(ConstraintSolver))]
-    public void Finds_at_least_what_NeighborSolver_finds(string solver_name)
+    public void Finds_at_least_what_NeighborSolver_finds(string solverName)
     {
         foreach (object[] board in RandomBoards())
         {
@@ -84,12 +85,13 @@ public class SolverTests
             tested.FieldAt(start.Index).Hidden = false;
 
             new NeighborSolver().Solve(reference);
-            Boards.Solver(solver_name).Solve(tested);
+            Boards.Solver(solverName).Solve(tested);
 
             foreach (Field expected in Boards.All(reference))
             {
                 Field actual = tested.FieldAt(expected.Index);
-                string where = $"{rows}x{columns}/{bombs} seed {seed}, cell ({expected.Position.X},{expected.Position.Y})";
+                string where = $"{rows}x{columns}/{bombs} seed {seed}, "
+                             + $"cell ({expected.Position.X},{expected.Position.Y})";
                 Assert.False(false == expected.Hidden && actual.Hidden, $"Missed a reveal: {where}");
                 Assert.False(expected.Flagged && false == actual.Flagged, $"Missed a flag: {where}");
             }
@@ -109,6 +111,7 @@ public class SolverTests
         return matrix;
     }
 
+    // Each number on its own decides nothing here, so NeighborSolver gets stuck.
     [Fact]
     public void NeighborSolver_cannot_solve_the_subset_board()
     {
@@ -122,11 +125,11 @@ public class SolverTests
     // ConstraintSolver beats NeighborSolver here by comparing equations (subset step).
     [Theory]
     [InlineData(nameof(ConstraintSolver))]
-    public void Solves_the_subset_board(string solver_name)
+    public void Solves_the_subset_board(string solverName)
     {
         FieldMatrix matrix = SubsetBoard();
 
-        Boards.Solver(solver_name).Solve(matrix);
+        Boards.Solver(solverName).Solve(matrix);
 
         Assert.True(matrix[0, 1].Flagged);
         Assert.True(Boards.IsSolved(matrix));

@@ -1,6 +1,4 @@
 using System.Collections.Generic;
-using System.Linq;
-
 
 namespace Mines.Solving;
 
@@ -23,12 +21,13 @@ abstract class SolvingStrategyBase : ISolvingStrategy
     /// <param name="location">The <see cref="Field.Index"/> of the revealed cell to start from.</param>
     /// <param name="cells">Receives the revealed cells visited; cells already in it are skipped.</param>
     /// <returns>The non-empty equations of the visited cells that have neighbouring bombs.</returns>
-    protected static List<Equation> createEquations(FieldMatrix fieldMatrix, EquationList list, int location, HashSet<int> cells)
+    protected static List<Equation> CreateEquations(FieldMatrix fieldMatrix, EquationList list, int location,
+                                                    HashSet<int> cells)
     {
         var equations = new List<Equation>();
-        var to_visit = new Stack<int>();
-        to_visit.Push(location);
-        while (to_visit.TryPop(out int current))
+        var toVisit = new Stack<int>();
+        toVisit.Push(location);
+        while (toVisit.TryPop(out int current))
         {
             Field field = fieldMatrix.FieldAt(current);
             if (field.Hidden || !cells.Add(current) || !list.GivesEquation(field))
@@ -46,7 +45,8 @@ abstract class SolvingStrategyBase : ISolvingStrategy
                 }
                 if (neighbor.IsBomb)
                 {
-                    equation.sum += neighbor.Hidden && !neighbor.Flagged ? 1 : 0;   // flags and revealed bombs are known
+                    // flags and revealed bombs are known
+                    equation.Sum += neighbor.Hidden && !neighbor.Flagged ? 1 : 0;
                     number += 1;
                 }
             }
@@ -61,7 +61,7 @@ abstract class SolvingStrategyBase : ISolvingStrategy
             }
             foreach (Field neighbor in field.Neighbors)
             {
-                to_visit.Push(neighbor.Index);
+                toVisit.Push(neighbor.Index);
             }
         }
         return equations;
@@ -95,12 +95,12 @@ abstract class SolvingStrategyBase : ISolvingStrategy
         }
         field.Hidden = false;
 
-        var revealed_cells = new HashSet<int>();
-        foreach (Equation new_equation in createEquations(fieldMatrix, equations, cell, revealed_cells))
+        var revealedCells = new HashSet<int>();
+        foreach (Equation newEquation in CreateEquations(fieldMatrix, equations, cell, revealedCells))
         {
-            equations.Add(new_equation);
+            equations.Add(newEquation);
         }
-        foreach (int revealed in revealed_cells)
+        foreach (int revealed in revealedCells)
         {
             equations.MarkSafe(revealed);
         }

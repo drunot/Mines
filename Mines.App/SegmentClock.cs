@@ -52,12 +52,12 @@ public class SegmentClock : Border
         {
             _digits[i] = new SevenSegmentDigit();
         }
-        _hours_colon = new SevenSegmentColon();
-        _minutes_colon = new SevenSegmentColon();
+        _hoursColon = new SevenSegmentColon();
+        _minutesColon = new SevenSegmentColon();
 
         _panel.Children.AddRange(new Control[]
         {
-            _digits[0], _digits[1], _hours_colon, _digits[2], _digits[3], _minutes_colon, _digits[4], _digits[5],
+            _digits[0], _digits[1], _hoursColon, _digits[2], _digits[3], _minutesColon, _digits[4], _digits[5],
         });
         Child = _panel;
         ShowTime();
@@ -96,8 +96,8 @@ public class SegmentClock : Border
         {
             _digits[i].Value = char.IsDigit(text[i]) ? text[i] - '0' : null;
         }
-        _hours_colon.IsOn = hours > 0;
-        _minutes_colon.IsOn = hours > 0 || minutes > 0;
+        _hoursColon.IsOn = hours > 0;
+        _minutesColon.IsOn = hours > 0 || minutes > 0;
     }
 
     /// <summary>
@@ -113,12 +113,12 @@ public class SegmentClock : Border
     /// <summary>
     /// The colon between the hours and the minutes.
     /// </summary>
-    private readonly SevenSegmentColon _hours_colon;
+    private readonly SevenSegmentColon _hoursColon;
 
     /// <summary>
     /// The colon between the minutes and the seconds.
     /// </summary>
-    private readonly SevenSegmentColon _minutes_colon;
+    private readonly SevenSegmentColon _minutesColon;
 
     /// <summary>
     /// The row of digits and colons; the clock's child.

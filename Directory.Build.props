@@ -1,0 +1,6 @@
+<Project>
+  <!-- Report the code style rules from .editorconfig (naming) as build warnings in every project. -->
+  <PropertyGroup>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+  </PropertyGroup>
+</Project>

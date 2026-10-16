@@ -1,10 +1,8 @@
 using System.Collections.Generic;
-using System.Linq;
 using System;
 using System.Diagnostics.CodeAnalysis;
 
 namespace Mines.Solving;
-
 
 /// <summary>
 /// The solving rules that each have their own queue of changed equations in <see cref="EquationList"/>.
@@ -33,8 +31,9 @@ public class EquationList
     const int FieldsBeforeLast = 20;
     /// <summary>
     /// Creates and adds the global equation (every hidden, unflagged cell; sum is
-    /// <see cref="FieldMatrix.BombsLeft"/>) once few enough fields are left. Does nothing if it already
-    /// exists or more than <see cref="FieldsBeforeLast"/> fields are left.
+    /// <see cref="FieldMatrix.BombsLeft"/>) once few enough fields are left. Does nothing if
+    /// <see cref="UseGlobalEquation"/> is off, if it already exists, or if more than
+    /// <see cref="FieldsBeforeLast"/> fields are left.
     /// </summary>
     public void TryCreateGlobalEquation()
     {
@@ -50,7 +49,7 @@ public class EquationList
                 _global.Add(f.Index);
             }
         }
-        _global.sum = _matrix.BombsLeft;
+        _global.Sum = _matrix.BombsLeft;
         Add(_global);
     }
 
@@ -104,9 +103,10 @@ public class EquationList
     public EquationList(FieldMatrix matrix)
     {
         _matrix = matrix;
-        _equation_record = new List<Equation>?[_matrix.Rows * _matrix.Columns];
+        _equationRecord = new List<Equation>?[_matrix.Rows * _matrix.Columns];
     }
 
+    /// <summary>The board the equations describe.</summary>
     FieldMatrix _matrix;
 
     /// <summary>
@@ -120,14 +120,14 @@ public class EquationList
         {
             return;
         }
-        if (_equation_record[equation.First]?.Contains(equation) == true)
+        if (_equationRecord[equation.First]?.Contains(equation) == true)
         {
             return;   // an equal equation already exists
         }
 
         foreach (int cell in equation.Cells)
         {
-            (_equation_record[cell] ??= new List<Equation>()).Add(equation);
+            (_equationRecord[cell] ??= new List<Equation>()).Add(equation);
         }
         MarkChanged(equation);
     }
@@ -143,16 +143,6 @@ public class EquationList
     /// </summary>
     /// <param name="cell">The <see cref="Field.Index"/> of the cell.</param>
     public void MarkBomb(int cell) => RemoveVariable(cell, 1);
-
-    /// <summary>
-    /// The equations that contain this cell, for the subset step.
-    /// </summary>
-    /// <param name="cell">The <see cref="Field.Index"/> of the cell.</param>
-    /// <returns>The equations containing the cell; empty if there are none.</returns>
-    public IReadOnlyList<Equation> Containing(int cell)
-    {
-        return (IReadOnlyList<Equation>?)_equation_record[cell] ?? Array.Empty<Equation>();
-    }
 
     /// <summary>
     /// Takes the next non-empty equation waiting in the queue for <paramref name="rule"/>.
@@ -187,7 +177,7 @@ public class EquationList
     /// <param name="bombs">1 if the cell is a bomb, 0 if it is safe.</param>
     private void RemoveVariable(int cell, int bombs)
     {
-        List<Equation>? containing = _equation_record[cell];
+        List<Equation>? containing = _equationRecord[cell];
         if (containing is null)
         {
             return;
@@ -195,7 +185,7 @@ public class EquationList
         foreach (Equation equation in containing)
         {
             equation.Remove(cell);
-            equation.sum -= bombs;
+            equation.Sum -= bombs;
             MarkChanged(equation);   // it lost a cell, so the rules may now apply to it
         }
         containing.Clear();
@@ -217,7 +207,7 @@ public class EquationList
         var candidates = new HashSet<Equation>(EquationIdentity.Instance);
         foreach (int cell in equation.Cells)
         {
-            List<Equation>? containing = _equation_record[cell];
+            List<Equation>? containing = _equationRecord[cell];
             if (containing is not null)
             {
                 candidates.UnionWith(containing);
@@ -229,19 +219,19 @@ public class EquationList
             candidates.Remove(_global);
         }
         var differences = new List<Equation>();
-        foreach (Equation test_equation in candidates)
+        foreach (Equation testEquation in candidates)
         {
-            if (test_equation.Count == 0)
+            if (testEquation.Count == 0)
             {
                 continue;
             }
-            if (test_equation.IsSubsetOf(equation))
+            if (testEquation.IsSubsetOf(equation))
             {
-                differences.Add(equation.Minus(test_equation));
+                differences.Add(equation.Minus(testEquation));
             }
-            else if (equation.IsSubsetOf(test_equation))
+            else if (equation.IsSubsetOf(testEquation))
             {
-                differences.Add(test_equation.Minus(equation));
+                differences.Add(testEquation.Minus(equation));
             }
         }
         foreach (Equation difference in differences)
@@ -251,7 +241,7 @@ public class EquationList
     }
 
     /// <summary>
-    /// Queue the equation for every rule; it changed, so each rule may now apply to it.
+    /// Queues the equation for every rule; it changed, so each rule may now apply to it.
     /// </summary>
     /// <param name="equation">The changed equation.</param>
     private void MarkChanged(Equation equation)
@@ -268,7 +258,7 @@ public class EquationList
     }
 
     /// <summary>Cell index -&gt; equations containing it (<c>null</c> if none yet).</summary>
-    private readonly List<Equation>?[] _equation_record;   // cell index -> equations containing it
+    private readonly List<Equation>?[] _equationRecord;   // cell index -> equations containing it
     /// <summary>One queue of changed equations per <see cref="Rule"/>.</summary>
     private readonly Queue<Equation>[] _pending = { new(), new(), new() };
 
@@ -286,17 +276,17 @@ public class EquationList
     private HashSet<Equation> GetGroupFromEquation(Equation equation, out HashSet<int> cells)
     {
         HashSet<Equation> equations = new HashSet<Equation>(EquationIdentity.Instance);
-        var local_cells = new HashSet<int>(equation.ToArray());
-        var checked_cells = new HashSet<int>();
+        var localCells = new HashSet<int>(equation.ToArray());
+        var checkedCells = new HashSet<int>();
         equations.Add(equation);
-        var to_visit = new Queue<int>(equation.ToArray());
-        while (to_visit.TryDequeue(out int v))
+        var toVisit = new Queue<int>(equation.ToArray());
+        while (toVisit.TryDequeue(out int v))
         {
-            if (!checked_cells.Add(v))
+            if (!checkedCells.Add(v))
             {
                 continue;   // already visited
             }
-            List<Equation>? containing = _equation_record[v];
+            List<Equation>? containing = _equationRecord[v];
             if (containing is null)
             {
                 continue;
@@ -307,12 +297,12 @@ public class EquationList
                 {
                     continue;   // the global equation, or already in the group
                 }
-                int new_cells = 0;
+                int newCells = 0;
                 foreach (int c in e.Cells)
                 {
-                    new_cells += local_cells.Contains(c) ? 0 : 1;
+                    newCells += localCells.Contains(c) ? 0 : 1;
                 }
-                if (local_cells.Count + new_cells > MaxCellsInGroup)
+                if (localCells.Count + newCells > MaxCellsInGroup)
                 {
                     continue;   // doesn't fit; it stays queued and can start its own piece later
                 }
@@ -320,19 +310,19 @@ public class EquationList
                 e.QueuedRules &= unchecked((byte)~(1 << (int)Rule.Enumeration));   // covered by this group
                 foreach (int next in e.Cells)
                 {
-                    local_cells.Add(next);
-                    to_visit.Enqueue(next);
+                    localCells.Add(next);
+                    toVisit.Enqueue(next);
                 }
             }
         }
-        cells = local_cells;
+        cells = localCells;
         return equations;
     }
 
     /// <summary>
     /// Set when the global equation came up in the enumeration queue, so its group needs enumerating again.
     /// </summary>
-    private bool _global_pending = false;
+    private bool _globalPending = false;
 
     /// <summary>
     /// Takes the group of the next changed equation waiting for <see cref="Rule.Enumeration"/>. The global
@@ -352,7 +342,7 @@ public class EquationList
         {
             if (ReferenceEquals(equation, _global))
             {
-                _global_pending = true;   // the global group needs enumerating again
+                _globalPending = true;   // the global group needs enumerating again
                 continue; // Skip global as stating equation.
             }
 
@@ -375,9 +365,9 @@ public class EquationList
         [NotNullWhen(true)] out HashSet<Equation>? equations,
         [NotNullWhen(true)] out HashSet<int>? cells)
     {
-        if (_global_pending && _global is not null)
+        if (_globalPending && _global is not null)
         {
-            _global_pending = false;
+            _globalPending = false;
             equations = GetGroupFromEquation(_global, out cells);
             return true;
         }

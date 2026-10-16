@@ -1,6 +1,5 @@
 using System;
 using System.Linq;
-using Mines;
 using Mines.Generators;
 using Mines.Solving;
 
@@ -10,6 +9,7 @@ namespace Mines.Tests;
 // the final layout, the first click, then the solver. How the generator got there doesn't matter.
 public class GeneratorTests
 {
+    // Each no-guess generator on the beginner, intermediate and expert sizes: (generator, rows, columns, bombs).
     public static TheoryData<string, int, int, int> Cases()
     {
         var data = new TheoryData<string, int, int, int>();
@@ -26,15 +26,15 @@ public class GeneratorTests
 
     [Theory]
     [MemberData(nameof(Cases))]
-    public void Boards_are_solvable_from_the_first_click(string generator_name, int rows, int columns, int bomb_count)
+    public void Boards_are_solvable_from_the_first_click(string generatorName, int rows, int columns, int bombCount)
     {
         var first = new Point<int>(rows / 2, columns / 2);
         for (int seed = 0; seed < SeedCount; ++seed)
         {
-            bool[,] bombs = Boards.Generate(Create(generator_name, seed), rows, columns, first, bomb_count);
-            string where = $"{generator_name} {rows}x{columns}/{bomb_count} seed {seed}";
+            bool[,] bombs = Boards.Generate(Create(generatorName, seed), rows, columns, first, bombCount);
+            string where = $"{generatorName} {rows}x{columns}/{bombCount} seed {seed}";
 
-            Assert.True(bomb_count == bombs.Cast<bool>().Count(b => b), $"wrong bomb count ({where})");
+            Assert.True(bombCount == bombs.Cast<bool>().Count(b => b), $"wrong bomb count ({where})");
             Assert.False(StartHasBomb(bombs, first), $"bomb in the start area ({where})");
 
             var matrix = new FieldMatrix(bombs);
@@ -44,11 +44,12 @@ public class GeneratorTests
         }
     }
 
-    private static IMatrixGenerator Create(string generator_name, int seed) => generator_name switch
+    // The generator with the given class name, seeded so a failing board can be generated again.
+    private static IMatrixGenerator Create(string generatorName, int seed) => generatorName switch
     {
         nameof(DeterministicGenerator) => new DeterministicGenerator(new Random(seed)),
         nameof(FastDeterministicGenerator) => new FastDeterministicGenerator(new Random(seed)),
-        _ => throw new ArgumentException($"Unknown generator {generator_name}"),
+        _ => throw new ArgumentException($"Unknown generator {generatorName}"),
     };
 
     // The 3x3 area around the first click must be free of bombs.

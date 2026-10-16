@@ -1,7 +1,4 @@
-
 using System.Collections.Generic;
-using System.Linq;
-using System;
 
 namespace Mines.Solving;
 
@@ -29,18 +26,22 @@ public class ConstraintSolver : IResumableSolver
     public bool IgnoreEdges { get; init; }
 
     /// <summary>
-    /// Builds an equation for every revealed field that shows a number (see
-    /// <see cref="EquationList.GivesEquation"/>): its hidden, unflagged neighbours add up to the number of
-    /// hidden, unflagged bombs around it.
+    /// Builds an equation for every revealed field that gives one (see <see cref="EquationList.GivesEquation"/>):
+    /// its hidden, unflagged neighbours add up to the number of hidden, unflagged bombs around it. A 0 gives an
+    /// empty equation, which <see cref="EquationList.Add"/> ignores.
     /// </summary>
     /// <param name="matrix">The board to read.</param>
-    /// <returns>A new <see cref="EquationList"/> holding the equations.</returns>
+    /// <returns>
+    /// A new <see cref="EquationList"/> holding the equations, with <see cref="UseGlobalEquation"/> and
+    /// <see cref="IgnoreEdges"/> passed on.
+    /// </returns>
     EquationList CollectEquations(FieldMatrix matrix)
     {
-        EquationList return_value = new EquationList(matrix) { UseGlobalEquation = UseGlobalEquation, IgnoreEdges = IgnoreEdges };
+        EquationList returnValue =
+            new EquationList(matrix) { UseGlobalEquation = UseGlobalEquation, IgnoreEdges = IgnoreEdges };
         foreach (Field f in matrix.Fields)
         {
-            if (f.Hidden || !return_value.GivesEquation(f))
+            if (f.Hidden || !returnValue.GivesEquation(f))
             {
                 continue;
             }
@@ -53,14 +54,13 @@ public class ConstraintSolver : IResumableSolver
                 }
                 if (neighbor.IsBomb && neighbor.Hidden && !neighbor.Flagged)
                 {
-                    equation.sum += 1;  // f.Number minus flags and revealed bombs, counted here to avoid a second pass.
+                    equation.Sum += 1;  // f.Number minus flags and revealed bombs, counted here to avoid a second pass.
                 }
             }
-            return_value.Add(equation);
+            returnValue.Add(equation);
         }
-        return return_value;
+        return returnValue;
     }
-
 
     /// <summary>The steps of the solver's state machine, in order of increasing cost.</summary>
     enum SolverStates
@@ -75,14 +75,12 @@ public class ConstraintSolver : IResumableSolver
         Exit,
     }
     /// <summary>The strategy to run in each state.</summary>
-    Dictionary<SolverStates, ISolvingStrategy> solvingStrategies = new Dictionary<SolverStates, ISolvingStrategy>
+    Dictionary<SolverStates, ISolvingStrategy> _solvingStrategies = new Dictionary<SolverStates, ISolvingStrategy>
     {
         {SolverStates.EnumerationSolver, new EnumerationStrategy()},
         {SolverStates.SubsetSolver, new SubsetStrategy()},
         {SolverStates.NeighborSolver, new NeighborStrategy()},
     };
-
-
 
     /// <summary>
     /// Reveals and flags every field that can be deduced without guessing. Changes
@@ -96,7 +94,6 @@ public class ConstraintSolver : IResumableSolver
         Solve();
     }
 
-
     /// <summary>
     /// Runs the strategies on <see cref="_matrix"/> with <see cref="_equations"/> until none of them makes
     /// progress.
@@ -108,7 +105,6 @@ public class ConstraintSolver : IResumableSolver
             return;
         }
 
-
         SolverStates states = SolverStates.NeighborSolver;
         while (true)
         {
@@ -119,8 +115,9 @@ public class ConstraintSolver : IResumableSolver
                 // Step 1: Simple neighbor solver.
                 case SolverStates.NeighborSolver:
                     {
-                        bool board_changed = solvingStrategies[SolverStates.NeighborSolver].ApplyStrategy(_matrix, _equations);
-                        if (!board_changed)
+                        bool boardChanged =
+                            _solvingStrategies[SolverStates.NeighborSolver].ApplyStrategy(_matrix, _equations);
+                        if (!boardChanged)
                         {
                             states = SolverStates.SubsetSolver;
                         }
@@ -129,8 +126,9 @@ public class ConstraintSolver : IResumableSolver
                 // Step 2: Simpler the full constraint check. (Subset check.)
                 case SolverStates.SubsetSolver:
                     {
-                        bool board_changed = solvingStrategies[SolverStates.SubsetSolver].ApplyStrategy(_matrix, _equations);
-                        if (!board_changed)
+                        bool boardChanged =
+                            _solvingStrategies[SolverStates.SubsetSolver].ApplyStrategy(_matrix, _equations);
+                        if (!boardChanged)
                         {
                             states = SolverStates.EnumerationSolver;
                         }
@@ -143,8 +141,9 @@ public class ConstraintSolver : IResumableSolver
                 // Step 3: Enumeration Solver. The most involved and last resort.
                 case SolverStates.EnumerationSolver:
                     {
-                        bool board_changed = solvingStrategies[SolverStates.EnumerationSolver].ApplyStrategy(_matrix, _equations);
-                        if (!board_changed)
+                        bool boardChanged =
+                            _solvingStrategies[SolverStates.EnumerationSolver].ApplyStrategy(_matrix, _equations);
+                        if (!boardChanged)
                         {
                             states = SolverStates.Exit;
                         }
@@ -187,6 +186,5 @@ public class ConstraintSolver : IResumableSolver
     private FieldMatrix? _matrix;
     /// <summary>The equations for <see cref="_matrix"/>; <c>null</c> before the first solve.</summary>
     private EquationList? _equations;
-
 
 }

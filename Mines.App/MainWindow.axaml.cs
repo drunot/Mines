@@ -98,10 +98,12 @@ public partial class MainWindow : Window
         {
             // The largest window content that fits: the working area (in pixels) minus the window frame.
             double scaling = screen.Scaling;
-            Size frame = FrameSize is Size outer ? new Size(outer.Width - ClientSize.Width, outer.Height - ClientSize.Height) : default;
-            double max_width = screen.WorkingArea.Width / scaling - frame.Width;
-            double max_height = screen.WorkingArea.Height / scaling - frame.Height;
-            wanted = new Size(Math.Min(wanted.Width, max_width), Math.Min(wanted.Height, max_height));
+            Size frame = FrameSize is Size outer
+                ? new Size(outer.Width - ClientSize.Width, outer.Height - ClientSize.Height)
+                : default;
+            double maxWidth = screen.WorkingArea.Width / scaling - frame.Width;
+            double maxHeight = screen.WorkingArea.Height / scaling - frame.Height;
+            wanted = new Size(Math.Min(wanted.Width, maxWidth), Math.Min(wanted.Height, maxHeight));
         }
         Width = Math.Ceiling(wanted.Width);
         Height = Math.Ceiling(wanted.Height);

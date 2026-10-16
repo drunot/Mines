@@ -1,6 +1,3 @@
-
-
-using System;
 using System.Collections.Generic;
 
 namespace Mines.Solving;
@@ -9,7 +6,7 @@ namespace Mines.Solving;
 /// A solver that can move bombs on the board it last solved and carry on from where it got stuck, instead of
 /// starting again from the first reveal.
 /// </summary>
-public interface IResumableSolver: ISolver
+public interface IResumableSolver : ISolver
 {
     /// <summary>
     /// Swaps bombs and free fields on the board of the last <see cref="ISolver.Solve"/> call and continues
@@ -21,7 +18,7 @@ public interface IResumableSolver: ISolver
     /// </remarks>
     /// <param name="swaps">
     /// The pairs of fields to swap (X is the row, Y the column), e.g. from
-    /// <see cref="BoardFixer.iBoardFixer.GetBoardChanges"/>. Both fields of a pair must be hidden and unflagged.
+    /// <see cref="BoardFixer.IBoardFixer.GetBoardChanges"/>. Both fields of a pair must be hidden and unflagged.
     /// </param>
     void SwapAndContinue(List<(Point<long>, Point<long>)> swaps);
 

@@ -76,7 +76,7 @@ public class BevelFrame : Decorator
     public override void Render(DrawingContext context)
     {
         base.Render(context);
-        if (_top_left is null || _bottom_right is null || Bounds.Size != _shape_size || Padding != _shape_padding)
+        if (_topLeft is null || _bottomRight is null || Bounds.Size != _shapeSize || Padding != _shapePadding)
         {
             BuildShapes(Bounds.Size, Padding);
         }
@@ -86,8 +86,8 @@ public class BevelFrame : Decorator
         {
             Color light = Color(IsHighlighted ? "BevelLightHover" : "BevelLight");
             Color dark = Color(IsHighlighted ? "BevelDarkHover" : "BevelDark");
-            context.DrawGeometry(CachedBrush(ref _top_left_brush, IsRaised ? light : dark), null, _top_left);
-            context.DrawGeometry(CachedBrush(ref _bottom_right_brush, IsRaised ? dark : light), null, _bottom_right);
+            context.DrawGeometry(CachedBrush(ref _topLeftBrush, IsRaised ? light : dark), null, _topLeft);
+            context.DrawGeometry(CachedBrush(ref _bottomRightBrush, IsRaised ? dark : light), null, _bottomRight);
         }
     }
 
@@ -96,15 +96,15 @@ public class BevelFrame : Decorator
     /// </summary>
     /// <param name="size">The size of the frame.</param>
     /// <param name="t">The frame width on each side.</param>
-    [MemberNotNull(nameof(_top_left), nameof(_bottom_right))]
+    [MemberNotNull(nameof(_topLeft), nameof(_bottomRight))]
     private void BuildShapes(Size size, Thickness t)
     {
         double w = size.Width;
         double h = size.Height;
 
         // Top and left edges.
-        var top_left = new StreamGeometry();
-        using (StreamGeometryContext g = top_left.Open())
+        var topLeft = new StreamGeometry();
+        using (StreamGeometryContext g = topLeft.Open())
         {
             g.BeginFigure(new Point(0, 0), true);
             g.LineTo(new Point(w, 0));
@@ -116,8 +116,8 @@ public class BevelFrame : Decorator
         }
 
         // Bottom and right edges.
-        var bottom_right = new StreamGeometry();
-        using (StreamGeometryContext g = bottom_right.Open())
+        var bottomRight = new StreamGeometry();
+        using (StreamGeometryContext g = bottomRight.Open())
         {
             g.BeginFigure(new Point(w, 0), true);
             g.LineTo(new Point(w, h));
@@ -128,10 +128,10 @@ public class BevelFrame : Decorator
             g.EndFigure(true);
         }
 
-        _top_left = top_left;
-        _bottom_right = bottom_right;
-        _shape_size = size;
-        _shape_padding = t;
+        _topLeft = topLeft;
+        _bottomRight = bottomRight;
+        _shapeSize = size;
+        _shapePadding = t;
     }
 
     /// <summary>
@@ -156,18 +156,20 @@ public class BevelFrame : Decorator
     /// <param name="key">The resource key, e.g. <c>BevelLight</c>.</param>
     /// <returns>The colour, or magenta if the resource is missing.</returns>
     private Color Color(string key) =>
-        this.TryFindResource(key, ActualThemeVariant, out object? value) && value is Color color ? color : Colors.Magenta;
+        this.TryFindResource(key, ActualThemeVariant, out object? value) && value is Color color
+            ? color
+            : Colors.Magenta;
 
-    /// <summary>The top and left edges, for <see cref="_shape_size"/> and <see cref="_shape_padding"/>.</summary>
-    private Geometry? _top_left;
-    /// <summary>The bottom and right edges, for <see cref="_shape_size"/> and <see cref="_shape_padding"/>.</summary>
-    private Geometry? _bottom_right;
+    /// <summary>The top and left edges, for <see cref="_shapeSize"/> and <see cref="_shapePadding"/>.</summary>
+    private Geometry? _topLeft;
+    /// <summary>The bottom and right edges, for <see cref="_shapeSize"/> and <see cref="_shapePadding"/>.</summary>
+    private Geometry? _bottomRight;
     /// <summary>The size the edge shapes were built for.</summary>
-    private Size _shape_size = new(-1, -1);
+    private Size _shapeSize = new(-1, -1);
     /// <summary>The frame width the edge shapes were built for.</summary>
-    private Thickness _shape_padding;
+    private Thickness _shapePadding;
     /// <summary>The brush last used for the top and left edges.</summary>
-    private ImmutableSolidColorBrush? _top_left_brush;
+    private ImmutableSolidColorBrush? _topLeftBrush;
     /// <summary>The brush last used for the bottom and right edges.</summary>
-    private ImmutableSolidColorBrush? _bottom_right_brush;
+    private ImmutableSolidColorBrush? _bottomRightBrush;
 }

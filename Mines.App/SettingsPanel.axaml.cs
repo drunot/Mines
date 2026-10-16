@@ -4,19 +4,26 @@ using Avalonia.Controls;
 namespace Mines;
 
 /// <summary>
-/// Which generator makes the boards.
+/// Which generator makes the boards, for a finite or an endless board.
 /// </summary>
 public enum GeneratorKind
 {
-    /// <summary>Uses <c>FastDeterministicGenerator</c>: boards are always solvable by logic.</summary>
+    /// <summary>
+    /// A finite board uses <c>FastDeterministicGenerator</c>: always solvable by logic. An endless board uses
+    /// <see cref="GeneratorType.Deterministic"/>: the first click opens an area, and the board tries to keep every
+    /// area solvable by logic.
+    /// </summary>
     NoGuessing,
-    /// <summary>Uses <c>ClassicRandomGenerator</c>: random boards that may need a guess.</summary>
+    /// <summary>
+    /// A finite board uses <c>ClassicRandomGenerator</c>, an endless board <see cref="GeneratorType.Random"/>:
+    /// random bombs that may need a guess; only the first clicked cell is kept free.
+    /// </summary>
     Classic,
 }
 
 /// <summary>
 /// The settings shown in the popup: a "Board" tab (size, bomb count and generator) and an "Endless" tab (bomb
-/// density). The tab that is open when "New game" is pressed decides which kind of game starts.
+/// density and generator). The tab that is open when "New game" is pressed decides which kind of game starts.
 /// </summary>
 /// <remarks>
 /// <see cref="Load"/> fills it in; <see cref="NewGame"/> or <see cref="Cancel"/> is raised when the player is done.
@@ -64,7 +71,8 @@ public partial class SettingsPanel : UserControl
     /// The selected generator: <see cref="GeneratorKind.Classic"/> if that option is checked,
     /// otherwise <see cref="GeneratorKind.NoGuessing"/>.
     /// </summary>
-    public GeneratorKind Generator => ClassicOption.IsChecked == true ? GeneratorKind.Classic : GeneratorKind.NoGuessing;
+    public GeneratorKind Generator =>
+        ClassicOption.IsChecked == true ? GeneratorKind.Classic : GeneratorKind.NoGuessing;
     /// <summary>
     /// Whether the "Endless" tab is selected: start an infinite board instead of a finite one.
     /// </summary>
@@ -86,24 +94,24 @@ public partial class SettingsPanel : UserControl
     /// </summary>
     /// <param name="rows">The number of rows.</param>
     /// <param name="columns">The number of columns.</param>
-    /// <param name="bomb_count">The number of bombs.</param>
+    /// <param name="bombCount">The number of bombs.</param>
     /// <param name="generator">The generator to select.</param>
     /// <param name="endless">Whether the current game is endless (opens the "Endless" tab).</param>
-    /// <param name="density_percent">The bomb density for an endless board, in percent.</param>
-    /// <param name="endless_generator">The generator to select for an endless board.</param>
-    public void Load(int rows, int columns, int bomb_count, GeneratorKind generator, bool endless, int density_percent,
-                     GeneratorKind endless_generator)
+    /// <param name="densityPercent">The bomb density for an endless board, in percent.</param>
+    /// <param name="endlessGenerator">The generator to select for an endless board.</param>
+    public void Load(int rows, int columns, int bombCount, GeneratorKind generator, bool endless, int densityPercent,
+                     GeneratorKind endlessGenerator)
     {
-        EndlessNoGuessingOption.IsChecked = endless_generator == GeneratorKind.NoGuessing;
-        EndlessClassicOption.IsChecked = endless_generator == GeneratorKind.Classic;
+        EndlessNoGuessingOption.IsChecked = endlessGenerator == GeneratorKind.NoGuessing;
+        EndlessClassicOption.IsChecked = endlessGenerator == GeneratorKind.Classic;
         ModeTabs.SelectedIndex = endless ? 1 : 0;
-        DensityInput.Value = Math.Clamp(density_percent, (int)DensityInput.Minimum, (int)DensityInput.Maximum);
+        DensityInput.Value = Math.Clamp(densityPercent, (int)DensityInput.Minimum, (int)DensityInput.Maximum);
         RowsInput.Value = rows;
         ColumnsInput.Value = columns;
         NoGuessingOption.IsChecked = generator == GeneratorKind.NoGuessing;
         ClassicOption.IsChecked = generator == GeneratorKind.Classic;
         LimitBombs();
-        BombsInput.Value = Math.Min(bomb_count, BombsInput.Maximum);
+        BombsInput.Value = Math.Min(bombCount, BombsInput.Maximum);
     }
 
     /// <summary>

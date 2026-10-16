@@ -1,8 +1,4 @@
-using System.Collections.Generic;
-using System.Linq;
-
 namespace Mines.Solving;
-
 
 /// <summary>
 /// Looks at one equation at a time: if its sum equals its number of cells all are bombs, if its sum
@@ -15,20 +11,22 @@ class NeighborStrategy : SolvingStrategyBase
     /// </summary>
     /// <param name="fieldMatrix">The board to change.</param>
     /// <param name="equations">The equations to take from and update.</param>
-    /// <returns><c>true</c> if an equation was taken (even if it decided nothing); <c>false</c> if none was waiting.</returns>
+    /// <returns>
+    /// <c>true</c> if an equation was taken (even if it decided nothing); <c>false</c> if none was waiting.
+    /// </returns>
     public override bool ApplyStrategy(FieldMatrix fieldMatrix, EquationList equations)
     {
         // Could still probably be one.
         if (equations.TryTakeChanged(Rule.Neighbor, out Equation equation))
         {
-            if (equation.Count == equation.sum)
+            if (equation.Count == equation.Sum)
             {
                 foreach (int cell in equation.ToArray())   // copy: MarkBomb changes this equation
                 {
                     Flag(fieldMatrix, equations, cell);
                 }
             }
-            else if (equation.sum == 0)
+            else if (equation.Sum == 0)
             {
                 foreach (int cell in equation.ToArray())
                 {

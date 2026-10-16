@@ -1,4 +1,6 @@
-// No-guess board generation: DeterministicGenerator and FastDeterministicGenerator (solver + EdgeBoardFixer).
+// No-guess board generation: DeterministicGenerator and FastDeterministicGenerator. Both run ConstraintSolver and
+// let EdgeBoardFixer move bombs when it gets stuck; the fast one continues the solver after each fix and solves a
+// fixed board once more from the first click before returning it.
 // Board i is always generated with new Random(i) and the first click in the centre, so every
 // run generates the same boards and results stay comparable while optimizing.
 
@@ -11,6 +13,7 @@ using Mines;
 using Mines.Generators;
 using Mines.Solving;
 
+// Time to generate a fixed set of boards, per generator and board size.
 [MemoryDiagnoser]
 public class GeneratorBench
 {
@@ -46,11 +49,13 @@ public class GeneratorBench
     }
 }
 
+// Board generation shared by GeneratorBench and the gencheck command, which also validates every board.
 public static class GeneratorCheck
 {
     // Fewer large boards, so one benchmark run doesn't take minutes.
     public static int BoardCount(int rows, int columns) => rows * columns > 1000 ? 5 : 50;
 
+    // The first click is always in the centre of the board.
     public static Point<int> FirstClick(int rows, int columns) => new Point<int>(rows / 2, columns / 2);
 
     // The generators to compare, by name.
@@ -60,9 +65,10 @@ public static class GeneratorCheck
         (nameof(FastDeterministicGenerator), random => new FastDeterministicGenerator(random)),
     };
 
-    public static bool[,] Generate(string generator_name, int rows, int columns, int bombs, int seed)
+    // Board number `seed` from the named generator, as a layout: bombs[row, column] is true for a bomb.
+    public static bool[,] Generate(string generatorName, int rows, int columns, int bombs, int seed)
     {
-        IMatrixGenerator generator = Generators.Single(g => g.Name == generator_name).Create(new Random(seed));
+        IMatrixGenerator generator = Generators.Single(g => g.Name == generatorName).Create(new Random(seed));
         // The generator fills the board on the first click, as in the game; read the layout back from it.
         var matrix = new FieldMatrix(rows, columns, bombs, generator);
         matrix.Initialize(FirstClick(rows, columns));
@@ -75,54 +81,58 @@ public static class GeneratorCheck
     }
 
     // Generates boards one by one with each generator, times each, and checks that every board is valid.
-    public static void Run(string board, int count, TimeSpan time_limit)
+    public static void Run(string board, int count, TimeSpan timeLimit)
     {
         foreach (var (name, _) in Generators)
         {
-            Run(name, board, count, time_limit);
+            Run(name, board, count, timeLimit);
         }
     }
 
-    private static void Run(string generator_name, string board, int count, TimeSpan time_limit)
+    // Generates `count` boards with one generator and prints the timings and the number of invalid boards.
+    // Exits the program if a single board takes longer than `timeLimit`.
+    private static void Run(string generatorName, string board, int count, TimeSpan timeLimit)
     {
-        var (rows, columns, bomb_count) = Boards.Parse(board);
+        var (rows, columns, bombCount) = Boards.Parse(board);
         Point<int> first = FirstClick(rows, columns);
         var times = new System.Collections.Generic.List<double>();
-        int wrong_count = 0, start_not_free = 0, not_solvable = 0;
+        int wrongCount = 0, startNotFree = 0, notSolvable = 0;
 
         for (int seed = 0; seed < count; ++seed)
         {
             var watch = Stopwatch.StartNew();
-            Task<bool[,]> task = Task.Run(() => Generate(generator_name, rows, columns, bomb_count, seed));
-            if (!task.Wait(time_limit))
+            Task<bool[,]> task = Task.Run(() => Generate(generatorName, rows, columns, bombCount, seed));
+            if (!task.Wait(timeLimit))
             {
-                Console.WriteLine($"  {generator_name} {board} seed {seed}: no board after {time_limit.TotalSeconds:F0} s, stopping");
+                Console.WriteLine(
+                    $"  {generatorName} {board} seed {seed}: no board after {timeLimit.TotalSeconds:F0} s, stopping");
                 Environment.Exit(1);
             }
             times.Add(watch.Elapsed.TotalMilliseconds);
             bool[,] bombs = task.Result;
 
-            if (bombs.Cast<bool>().Count(b => b) != bomb_count)
+            if (bombs.Cast<bool>().Count(b => b) != bombCount)
             {
-                wrong_count++;
+                wrongCount++;
             }
             if (StartHasBomb(bombs, first))
             {
-                start_not_free++;
+                startNotFree++;
             }
             if (!SolvableFromFirstClick(bombs, first))
             {
-                not_solvable++;
+                notSolvable++;
             }
         }
 
         times.Sort();
-        Console.WriteLine($"{generator_name} {board}: {count} boards, per board: mean {times.Average():F1} ms, "
+        Console.WriteLine($"{generatorName} {board}: {count} boards, per board: mean {times.Average():F1} ms, "
             + $"median {times[times.Count / 2]:F1} ms, max {times[^1]:F1} ms | "
-            + $"wrong bomb count {wrong_count}, bomb in start area {start_not_free}, "
-            + $"not solvable by ConstraintSolver {not_solvable}");
+            + $"wrong bomb count {wrongCount}, bomb in start area {startNotFree}, "
+            + $"not solvable by ConstraintSolver {notSolvable}");
     }
 
+    // Whether the 3x3 area around the first click has a bomb.
     private static bool StartHasBomb(bool[,] bombs, Point<int> first)
     {
         for (int r = Math.Max(0, first.X - 1); r <= Math.Min(bombs.GetLength(0) - 1, first.X + 1); ++r)

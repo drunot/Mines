@@ -1,22 +1,22 @@
-
 namespace Mines.BoardFixer;
 
 using System.Diagnostics.CodeAnalysis;
-using System;
 using System.Collections.Generic;
 
 /// <summary>
 /// Changes the bomb layout of a board the solver got stuck on, so it may become solvable.
 /// </summary>
-public interface iBoardFixer
+public interface IBoardFixer
 {
     /// <summary>
     /// Tries to move bombs on <paramref name="board"/> so the solver can get further.
     /// </summary>
     /// <param name="board">The partly solved board; it may be changed.</param>
-    /// <param name="fixed_board">The new bomb layout (<c>[row, column]</c> is true for a bomb), or <c>null</c> on failure.</param>
+    /// <param name="fixedBoard">
+    /// The new bomb layout (<c>[row, column]</c> is true for a bomb), or <c>null</c> on failure.
+    /// </param>
     /// <returns><c>true</c> if a new layout was produced.</returns>
-    bool FixBoard(FieldMatrix board, [NotNullWhen(true)] out bool[,]? fixed_board);
+    bool FixBoard(FieldMatrix board, [NotNullWhen(true)] out bool[,]? fixedBoard);
 
     /// <summary>
     /// Works out which bombs to move on <paramref name="board"/> so the solver can get further, without
@@ -34,6 +34,7 @@ public interface iBoardFixer
     /// seen; <c>null</c> to allow every cell.
     /// </param>
     /// <returns><c>true</c> if swaps were found.</returns>
-    bool GetBoardChanges(FieldMatrix board, [NotNullWhen(true)] out List<(Point<long>, Point<long>)>? swaps, bool[,]? locked = null);
+    bool GetBoardChanges(FieldMatrix board, [NotNullWhen(true)] out List<(Point<long>, Point<long>)>? swaps,
+                         bool[,]? locked = null);
 
 }

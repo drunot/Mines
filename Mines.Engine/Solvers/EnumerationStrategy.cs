@@ -1,8 +1,6 @@
 using System.Collections.Generic;
-using System.Linq;
 
 namespace Mines.Solving;
-
 
 /// <summary>
 /// The last-resort strategy: tries every possible bomb layout of a group of connected equations and
@@ -23,13 +21,13 @@ class EnumerationStrategy : SolvingStrategyBase
     public override bool ApplyStrategy(FieldMatrix fieldMatrix, EquationList equations)
     {
         // Changed groups first; the global group is the last resort.
-        if (!equations.TryTakeEnumerationGroup(out HashSet<Equation>? equation_group, out HashSet<int>? cells) &&
-            !equations.TryTakeGlobalGroup(out equation_group, out cells))
+        if (!equations.TryTakeEnumerationGroup(out HashSet<Equation>? equationGroup, out HashSet<int>? cells) &&
+            !equations.TryTakeGlobalGroup(out equationGroup, out cells))
         {
             return false;
         }
 
-        var group = new Group(equation_group, cells);
+        var group = new Group(equationGroup, cells);
         group.Enumerate();
 
         if (group.SolutionCount == 0)
@@ -76,11 +74,11 @@ class EnumerationStrategy : SolvingStrategyBase
         /// <summary>
         /// Converts a group of equations and their cells into arrays ready for <see cref="Enumerate"/>.
         /// </summary>
-        /// <param name="equation_group">The equations of the group.</param>
+        /// <param name="equationGroup">The equations of the group.</param>
         /// <param name="cells">The cells (<see cref="Field.Index"/> values) appearing in those equations.</param>
-        public Group(HashSet<Equation> equation_group, HashSet<int> cells)
+        public Group(HashSet<Equation> equationGroup, HashSet<int> cells)
         {
-            Cells = OrderCells(equation_group, cells);
+            Cells = OrderCells(equationGroup, cells);
 
             var index = new Dictionary<int, int>();   // cell -> position in Cells, used only during setup
             for (int i = 0; i < Cells.Length; ++i)
@@ -89,18 +87,18 @@ class EnumerationStrategy : SolvingStrategyBase
             }
 
             // The equations of this group, written in terms of cell indices, not cells.
-            _eqs = new EquationRecord[equation_group.Count];
+            _eqs = new EquationRecord[equationGroup.Count];
             int k = 0;
-            foreach (Equation e in equation_group)
+            foreach (Equation e in equationGroup)
             {
                 var vars = new int[e.Count];
                 for (int v = 0; v < e.Count; v++)
                 {
                     vars[v] = index[e.Cells[v]];
                 }
-                _eqs[k++] = new EquationRecord(vars, e.sum);
+                _eqs[k++] = new EquationRecord(vars, e.Sum);
             }
-            _eqs_of_var = EquationsOfEachCell(_eqs, Cells.Length);
+            _eqsOfVar = EquationsOfEachCell(_eqs, Cells.Length);
             _values = new FieldValues[Cells.Length];   // all Unknown (the default)
             MineCount = new int[Cells.Length];
         }
@@ -167,7 +165,7 @@ class EnumerationStrategy : SolvingStrategyBase
         /// <returns><c>true</c> if no equation containing it is already violated.</returns>
         private bool StillPossible(int v)
         {
-            foreach (int e in _eqs_of_var[v])
+            foreach (int e in _eqsOfVar[v])
             {
                 int sum = 0;        // bombs assigned so far in this equation
                 int unassigned = 0; // cells not yet decided
@@ -199,21 +197,21 @@ class EnumerationStrategy : SolvingStrategyBase
         /// <summary>
         /// Number the cells in the order a search through the equations reaches them.
         /// </summary>
-        /// <param name="equation_group">The equations of the group.</param>
+        /// <param name="equationGroup">The equations of the group.</param>
         /// <param name="cells">The cells of the group.</param>
         /// <returns>The cells (<see cref="Field.Index"/> values) in breadth-first order.</returns>
-        private static int[] OrderCells(HashSet<Equation> equation_group, HashSet<int> cells)
+        private static int[] OrderCells(HashSet<Equation> equationGroup, HashSet<int> cells)
         {
             // Cell -> the group's equations that contain it.
-            var eqs_of_cell = new Dictionary<int, List<Equation>>();
-            foreach (Equation e in equation_group)
+            var eqsOfCell = new Dictionary<int, List<Equation>>();
+            foreach (Equation e in equationGroup)
             {
                 foreach (int p in e.Cells)
                 {
-                    if (!eqs_of_cell.TryGetValue(p, out List<Equation>? list))
+                    if (!eqsOfCell.TryGetValue(p, out List<Equation>? list))
                     {
                         list = new List<Equation>();
-                        eqs_of_cell[p] = list;
+                        eqsOfCell[p] = list;
                     }
                     list.Add(e);
                 }
@@ -232,7 +230,7 @@ class EnumerationStrategy : SolvingStrategyBase
                 while (queue.TryDequeue(out int p))
                 {
                     order.Add(p);
-                    foreach (Equation e in eqs_of_cell[p])
+                    foreach (Equation e in eqsOfCell[p])
                     {
                         if (e.Count > 8)
                         {
@@ -255,11 +253,14 @@ class EnumerationStrategy : SolvingStrategyBase
         /// For each cell index, the indices of the equations that contain it.
         /// </summary>
         /// <param name="eqs">The equations of the group.</param>
-        /// <param name="cell_count">The number of cells in the group.</param>
-        /// <returns>For each position in <see cref="Cells"/>, the indices into <paramref name="eqs"/> of the equations containing it.</returns>
-        private static int[][] EquationsOfEachCell(EquationRecord[] eqs, int cell_count)
+        /// <param name="cellCount">The number of cells in the group.</param>
+        /// <returns>
+        /// For each position in <see cref="Cells"/>, the indices into <paramref name="eqs"/> of the equations
+        /// containing it.
+        /// </returns>
+        private static int[][] EquationsOfEachCell(EquationRecord[] eqs, int cellCount)
         {
-            var count = new int[cell_count];
+            var count = new int[cellCount];
             foreach (EquationRecord eq in eqs)
             {
                 foreach (int v in eq.Vars)
@@ -268,26 +269,29 @@ class EnumerationStrategy : SolvingStrategyBase
                 }
             }
 
-            var eqs_of_var = new int[cell_count][];
-            for (int v = 0; v < cell_count; v++)
+            var eqsOfVar = new int[cellCount][];
+            for (int v = 0; v < cellCount; v++)
             {
-                eqs_of_var[v] = new int[count[v]];
+                eqsOfVar[v] = new int[count[v]];
             }
 
             for (int e = 0; e < eqs.Length; e++)
             {
                 foreach (int v in eqs[e].Vars)
                 {
-                    eqs_of_var[v][--count[v]] = e;
+                    eqsOfVar[v][--count[v]] = e;
                 }
             }
-            return eqs_of_var;
+            return eqsOfVar;
         }
 
         /// <summary>The equations of this group, in terms of positions in <see cref="Cells"/>.</summary>
         private readonly EquationRecord[] _eqs;
-        /// <summary>For each position in <see cref="Cells"/>, the indices into <see cref="_eqs"/> of the equations containing it.</summary>
-        private readonly int[][] _eqs_of_var;
+        /// <summary>
+        /// For each position in <see cref="Cells"/>, the indices into <see cref="_eqs"/> of the equations
+        /// containing it.
+        /// </summary>
+        private readonly int[][] _eqsOfVar;
         /// <summary>The current assignment of each position in <see cref="Cells"/> during the search.</summary>
         private readonly FieldValues[] _values;
         /// <summary>Set when no cell can be decided any more, so the search stops early.</summary>

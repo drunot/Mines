@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Globalization;
 using Avalonia;
@@ -106,10 +105,10 @@ internal sealed class TilePalette
     /// <returns>The pen.</returns>
     public Pen FaceLinePen(double width)
     {
-        if (!_face_pens.TryGetValue(width, out Pen? pen))
+        if (!_facePens.TryGetValue(width, out Pen? pen))
         {
             pen = new Pen(FaceLine, width, lineCap: PenLineCap.Round, lineJoin: PenLineJoin.Round);
-            _face_pens[width] = pen;
+            _facePens[width] = pen;
         }
         return pen;
     }
@@ -144,7 +143,8 @@ internal sealed class TilePalette
         if (!_numbers.TryGetValue(number, out TextLayout? text))
         {
             text = new TextLayout(number.ToString(CultureInfo.InvariantCulture),
-                new Typeface(_font, FontStyle.Normal, FontWeight.Bold), TileShapes.NumberFontSize, Brush($"NumberBrush{number}"));
+                new Typeface(_font, FontStyle.Normal, FontWeight.Bold), TileShapes.NumberFontSize,
+                Brush($"NumberBrush{number}"));
             _numbers[number] = text;
         }
         return text;
@@ -206,6 +206,6 @@ internal sealed class TilePalette
     /// <summary>
     /// Cache for <see cref="FaceLinePen"/>, by width.
     /// </summary>
-    private readonly Dictionary<double, Pen> _face_pens = new();
+    private readonly Dictionary<double, Pen> _facePens = new();
 }
 

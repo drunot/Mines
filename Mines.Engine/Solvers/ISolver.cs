@@ -1,5 +1,3 @@
-
-
 namespace Mines.Solving;
 
 /// <summary>
@@ -7,7 +5,7 @@ namespace Mines.Solving;
 /// </summary>
 public interface ISolver
 {
-    
+
     /// <summary>
     /// Reveals and flags the fields of <paramref name="fieldMatrix"/> that can be deduced.
     /// </summary>

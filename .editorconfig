@@ -1,0 +1,73 @@
+# Code style for the C# projects. The editor shows these rules as you type, and `dotnet build` reports
+# naming violations as warnings (EnforceCodeStyleInBuild in Directory.Build.props).
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.{cs,axaml,xaml,csproj,props,slnx}]
+indent_style = space
+indent_size = 4
+
+[*.{axaml,xaml,csproj,props,slnx}]
+indent_size = 2
+
+[*.cs]
+max_line_length = 120
+
+# ---- Naming ----
+dotnet_diagnostic.IDE1006.severity = warning
+# PascalCase: types, namespaces, methods and local functions, properties, events, enum values, constants and
+# static readonly fields. camelCase: local variables and parameters. _camelCase: private and internal fields.
+# s_camelCase: private static fields that aren't readonly. I + PascalCase: interfaces.
+
+dotnet_naming_symbols.interfaces.applicable_kinds = interface
+dotnet_naming_style.i_pascal.required_prefix = I
+dotnet_naming_style.i_pascal.capitalization = pascal_case
+dotnet_naming_rule.interfaces_i_pascal.symbols = interfaces
+dotnet_naming_rule.interfaces_i_pascal.style = i_pascal
+dotnet_naming_rule.interfaces_i_pascal.severity = warning
+
+dotnet_naming_symbols.constants.applicable_kinds = field, local
+dotnet_naming_symbols.constants.required_modifiers = const
+dotnet_naming_style.pascal.capitalization = pascal_case
+dotnet_naming_rule.constants_pascal.symbols = constants
+dotnet_naming_rule.constants_pascal.style = pascal
+dotnet_naming_rule.constants_pascal.severity = warning
+
+dotnet_naming_symbols.static_readonly_fields.applicable_kinds = field
+dotnet_naming_symbols.static_readonly_fields.required_modifiers = static, readonly
+dotnet_naming_rule.static_readonly_pascal.symbols = static_readonly_fields
+dotnet_naming_rule.static_readonly_pascal.style = pascal
+dotnet_naming_rule.static_readonly_pascal.severity = warning
+
+dotnet_naming_symbols.private_static_fields.applicable_kinds = field
+dotnet_naming_symbols.private_static_fields.applicable_accessibilities = private, internal, private_protected
+dotnet_naming_symbols.private_static_fields.required_modifiers = static
+dotnet_naming_style.s_camel.required_prefix = s_
+dotnet_naming_style.s_camel.capitalization = camel_case
+dotnet_naming_rule.private_static_fields_s_camel.symbols = private_static_fields
+dotnet_naming_rule.private_static_fields_s_camel.style = s_camel
+dotnet_naming_rule.private_static_fields_s_camel.severity = warning
+
+dotnet_naming_symbols.private_fields.applicable_kinds = field
+dotnet_naming_symbols.private_fields.applicable_accessibilities = private, internal, private_protected
+dotnet_naming_style.underscore_camel.required_prefix = _
+dotnet_naming_style.underscore_camel.capitalization = camel_case
+dotnet_naming_rule.private_fields_underscore.symbols = private_fields
+dotnet_naming_rule.private_fields_underscore.style = underscore_camel
+dotnet_naming_rule.private_fields_underscore.severity = warning
+
+dotnet_naming_symbols.locals_and_parameters.applicable_kinds = local, parameter
+dotnet_naming_style.camel.capitalization = camel_case
+dotnet_naming_rule.locals_camel.symbols = locals_and_parameters
+dotnet_naming_rule.locals_camel.style = camel
+dotnet_naming_rule.locals_camel.severity = warning
+
+dotnet_naming_symbols.everything_else.applicable_kinds = namespace, class, struct, enum, delegate, method, local_function, property, event, field, enum_member, type_parameter
+dotnet_naming_rule.everything_else_pascal.symbols = everything_else
+dotnet_naming_rule.everything_else_pascal.style = pascal
+dotnet_naming_rule.everything_else_pascal.severity = warning

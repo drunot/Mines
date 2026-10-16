@@ -9,24 +9,23 @@ using Mines.Generators;
 namespace Mines;
 
 /// <summary>
-/// The game: a toolbar with the counter, the face (reset) button, the settings button with its popup and
-/// the timer, above the <see cref="Mines.BoardView"/>.
+/// The game: a toolbar with the counters, the face (reset) button, the settings button with its popup and
+/// the clock, above the <see cref="Mines.BoardView"/>.
 /// </summary>
 /// <remarks>
 /// <para>
 /// Plays a finite board of <see cref="Rows"/> by <see cref="Columns"/>, or an endless board when
 /// <see cref="Endless"/> is set. On a finite board the counter shows the bombs left and the game ends on a bomb or
-/// a win; on an endless board it shows the safe clicks in a row (the best so far in its tooltip), and a bomb only
-/// resets that count.
+/// a win; on an endless board it shows the safe clicks in a row, a second counter shows the best streak, and a
+/// bomb only resets the streak.
 /// </para>
 /// <para>
-/// Builds a new board when the size or the settings change, and saves and loads the settings and an
-/// unfinished finite game through <see cref="SavedState"/>.
+/// Builds a new board when the size or the settings change, and saves and loads the settings and the game (a
+/// finite game only while unfinished, an endless one once started) through <see cref="SavedState"/>.
 /// </para>
 /// </remarks>
 public partial class Minefield : UserControl
 {
-
     /// <summary>
     /// Defines the <see cref="Rows"/> property.
     /// </summary>
@@ -64,7 +63,7 @@ public partial class Minefield : UserControl
     }
 
     /// <summary>
-    /// The number of bombs on new boards. Takes effect with the next new game.
+    /// The number of bombs on new finite boards. Takes effect with the next new game.
     /// </summary>
     public int BombCount
     {
@@ -79,7 +78,7 @@ public partial class Minefield : UserControl
         AvaloniaProperty.Register<Minefield, GeneratorKind>(nameof(Generator), defaultValue: GeneratorKind.NoGuessing);
 
     /// <summary>
-    /// Which generator makes new boards.
+    /// Which generator makes new finite boards. Takes effect with the next new game.
     /// </summary>
     public GeneratorKind Generator
     {
@@ -131,7 +130,8 @@ public partial class Minefield : UserControl
                 return null;
             }
             // Everything that isn't the board: toolbar, frames and margins.
-            Size chrome = new Size(Bounds.Width - BoardScroller.Bounds.Width, Bounds.Height - BoardScroller.Bounds.Height);
+            Size chrome = new Size(Bounds.Width - BoardScroller.Bounds.Width,
+                Bounds.Height - BoardScroller.Bounds.Height);
             return new Size(Math.Max(chrome.Width + board.Width, MinimumWidth), chrome.Height + board.Height);
         }
     }
@@ -178,7 +178,7 @@ public partial class Minefield : UserControl
         SettingsPanel.NewGame += (sender, e) =>
         {
             SettingsPopup.IsOpen = false;
-            _applying_settings = true;   // one new board for all the changes, not one per property
+            _applyingSettings = true;   // one new board for all the changes, not one per property
             Rows = SettingsPanel.Rows;
             Columns = SettingsPanel.Columns;
             BombCount = SettingsPanel.BombCount;
@@ -186,7 +186,7 @@ public partial class Minefield : UserControl
             Endless = SettingsPanel.Endless;
             DensityPercent = SettingsPanel.DensityPercent;
             EndlessGenerator = SettingsPanel.EndlessGenerator;
-            _applying_settings = false;
+            _applyingSettings = false;
             BuildBoard();
             SaveState();   // remember the new settings right away
         };
@@ -201,28 +201,30 @@ public partial class Minefield : UserControl
     {
         base.OnPropertyChanged(change);
 
-        if (!_applying_settings && (change.Property == RowsProperty || change.Property == ColumnsProperty))
+        if (!_applyingSettings && (change.Property == RowsProperty || change.Property == ColumnsProperty))
         {
             BuildBoard();
         }
     }
 
-
     /// <summary>
     /// A new game: a fresh board, shown by the board view.
     /// </summary>
     /// <remarks>
-    /// An endless board with <see cref="DensityPercent"/> and <see cref="EndlessGenerator"/>, or a finite one made by the generator chosen by
-    /// <see cref="Generator"/>. Unlocks the board and resets the timer, the counter and the face.
+    /// An endless board with <see cref="DensityPercent"/> and <see cref="EndlessGenerator"/>, or a finite one of
+    /// <see cref="Rows"/> by <see cref="Columns"/> with <see cref="BombCount"/> bombs, made by the generator chosen
+    /// by <see cref="Generator"/>. Unlocks the board and resets the clock, the counters and the face.
     /// </remarks>
     [MemberNotNull(nameof(_board))]
     private void BuildBoard()
     {
         if (Endless)
         {
-            GeneratorType type = EndlessGenerator == GeneratorKind.Classic ? GeneratorType.Random : GeneratorType.Deterministic;
-            _endless_density = DensityPercent;
-            _endless_generator = EndlessGenerator;
+            GeneratorType type = EndlessGenerator == GeneratorKind.Classic
+                ? GeneratorType.Random
+                : GeneratorType.Deterministic;
+            _endlessDensity = DensityPercent;
+            _endlessGenerator = EndlessGenerator;
             ShowBoard(new InfiniteFieldMatrix(DensityPercent / 100f, type));
             return;
         }
@@ -234,7 +236,8 @@ public partial class Minefield : UserControl
 
     /// <summary>
     /// Makes <paramref name="board"/> the current board: listens to it, shows it, unlocks it, and resets the
-    /// timer, the counter and the face. Raises <see cref="BoardSizeChanged"/> if its size differs from before.
+    /// clock, the counters and the face. Raises <see cref="BoardShown"/>, and <see cref="BoardSizeChanged"/> if it
+    /// is a finite board of another size than the last one shown.
     /// </summary>
     /// <param name="board">The new board.</param>
     [MemberNotNull(nameof(_board))]
@@ -253,10 +256,10 @@ public partial class Minefield : UserControl
         UpdateFace();
 
         BoardShown?.Invoke(this, EventArgs.Empty);
-        if (_board.Size != _shown_size)
+        if (_board.Size != _shownSize)
         {
-            _shown_size = _board.Size;
-            if (_shown_size is not null)
+            _shownSize = _board.Size;
+            if (_shownSize is not null)
             {
                 BoardSizeChanged?.Invoke(this, EventArgs.Empty);
             }
@@ -266,11 +269,11 @@ public partial class Minefield : UserControl
     /// <summary>
     /// The size of the board shown last (<c>null</c> for an endless board), to tell a new size from a new game.
     /// </summary>
-    private BoardSize? _shown_size;
+    private BoardSize? _shownSize;
 
     /// <summary>
-    /// Handles a change of a cell on the board: updates the bomb counter, starts the clock on the first
-    /// reveal and schedules a face update.
+    /// Handles a change on the board: updates the counters, starts the clock on the first reveal and schedules a
+    /// face update.
     /// </summary>
     /// <param name="sender">The board.</param>
     /// <param name="e">The event data.</param>
@@ -278,7 +281,7 @@ public partial class Minefield : UserControl
     {
         UpdateCounter();
         // The first click places the bombs and reveals; that starts the clock (a flag before it doesn't).
-        if (!_clock.IsRunning && !_time_final && _board.Initialized && !_board.GameLost)
+        if (!_clock.IsRunning && !_timeFinal && _board.Initialized && !_board.GameLost)
         {
             _clock.Start();
             _timer.Start();
@@ -286,12 +289,12 @@ public partial class Minefield : UserControl
         }
         // A cascade raises FieldChanged once per revealed cell, and checking for a win looks at every cell,
         // so the face is updated once, after the current batch of changes.
-        if (!_face_update_pending)
+        if (!_faceUpdatePending)
         {
-            _face_update_pending = true;
+            _faceUpdatePending = true;
             Dispatcher.UIThread.Post(() =>
             {
-                _face_update_pending = false;
+                _faceUpdatePending = false;
                 UpdateFace();
             });
         }
@@ -300,11 +303,11 @@ public partial class Minefield : UserControl
     /// <summary>
     /// True while a face update has been posted to the dispatcher but has not run yet.
     /// </summary>
-    private bool _face_update_pending;
+    private bool _faceUpdatePending;
     /// <summary>
     /// True while several settings are being changed together, so that only one new board is built.
     /// </summary>
-    private bool _applying_settings;
+    private bool _applyingSettings;
 
     /// <summary>
     /// Updates the face on the reset button and handles the end of a game.
@@ -318,12 +321,12 @@ public partial class Minefield : UserControl
     {
         bool lost = _board.GameLost;
         bool won = !lost && _board.GameWon;
-        bool just_hit = _board is InfiniteFieldMatrix endless && endless.LastActionHitBomb;
+        bool justHit = _board is InfiniteFieldMatrix endless && endless.LastActionHitBomb;
         if ((lost || won) && _clock.IsRunning)
         {
             _clock.Stop();
             _timer.Stop();
-            _time_final = true;   // stays stopped until the next game
+            _timeFinal = true;   // stays stopped until the next game
             ShowTime();
         }
         if (won && _board is FieldMatrix finished)
@@ -341,7 +344,7 @@ public partial class Minefield : UserControl
         {
             BoardView.IsLocked = true;   // the game is over; a new game unlocks the board
         }
-        ResetButton.Face = lost || just_hit ? Face.Dead
+        ResetButton.Face = lost || justHit ? Face.Dead
                          : won ? Face.Won
                          : BoardView.IsPressing ? Face.Excited
                          : Face.Normal;
@@ -353,18 +356,19 @@ public partial class Minefield : UserControl
     /// Measures the playing time of the current game (since this run of the app).
     /// </summary>
     private readonly Stopwatch _clock = new();
-    private readonly DispatcherTimer _timer = new() { Interval = TimeSpan.FromMilliseconds(200) };   // refreshes the display
+    // refreshes the display
+    private readonly DispatcherTimer _timer = new() { Interval = TimeSpan.FromMilliseconds(200) };
     /// <summary>
     /// True once the game is lost or won: the time is final and the clock must not start again until the next game.
     /// </summary>
-    private bool _time_final;
+    private bool _timeFinal;
 
-    private TimeSpan _time_before;   // time from before a restart, when an unfinished game is continued
+    private TimeSpan _timeBefore;   // time from before a restart, when an unfinished game is continued
 
     /// <summary>
     /// The total playing time of the current game, including time from before a restart.
     /// </summary>
-    private TimeSpan Elapsed => _time_before + _clock.Elapsed;
+    private TimeSpan Elapsed => _timeBefore + _clock.Elapsed;
 
     /// <summary>
     /// Stops and clears the clock for a new game and shows zero.
@@ -373,8 +377,8 @@ public partial class Minefield : UserControl
     {
         _clock.Reset();
         _timer.Stop();
-        _time_before = TimeSpan.Zero;
-        _time_final = false;
+        _timeBefore = TimeSpan.Zero;
+        _timeFinal = false;
         ShowTime();
     }
 
@@ -410,8 +414,8 @@ public partial class Minefield : UserControl
             EndlessGame = _board is InfiniteFieldMatrix endless && endless.Initialized
                 ? new SavedEndlessGame
                 {
-                    DensityPercent = _endless_density,
-                    Generator = _endless_generator,
+                    DensityPercent = _endlessDensity,
+                    Generator = _endlessGenerator,
                     ElapsedSeconds = Elapsed.TotalSeconds,
                     ViewRow = BoardView.CenterCell.X,
                     ViewColumn = BoardView.CenterCell.Y,
@@ -423,11 +427,12 @@ public partial class Minefield : UserControl
     }
 
     /// <summary>
-    /// Loads the saved settings and continues a saved unfinished game (timer included).
+    /// Loads the saved settings and the window size, and continues the saved game of the saved kind: an
+    /// unfinished finite game, or an endless game with its view (the clock included).
     /// </summary>
     /// <remarks>
-    /// Without a save file, the current settings and board stay. With settings but no valid saved game,
-    /// a new board is built.
+    /// Without a save file, the current settings and board stay. With settings but no usable saved game of that
+    /// kind, a new board is built.
     /// </remarks>
     public void LoadState()
     {
@@ -436,7 +441,7 @@ public partial class Minefield : UserControl
         {
             return;
         }
-        _applying_settings = true;   // one new board for all the changes, not one per property
+        _applyingSettings = true;   // one new board for all the changes, not one per property
         Rows = state.Settings.Rows;
         Columns = state.Settings.Columns;
         BombCount = state.Settings.BombCount;
@@ -449,13 +454,14 @@ public partial class Minefield : UserControl
         {
             WindowSize = new Size(width, height);
         }
-        _applying_settings = false;
+        _applyingSettings = false;
 
         if (!Endless && state.Game is SavedGame game && game.IsValid())
         {
             ContinueGame(game);
         }
-        else if (Endless && state.EndlessGame is SavedEndlessGame endless && endless.ToBoard() is InfiniteFieldMatrix board)
+        else if (Endless && state.EndlessGame is SavedEndlessGame endless
+            && endless.ToBoard() is InfiniteFieldMatrix board)
         {
             ContinueEndlessGame(endless, board);
         }
@@ -473,7 +479,7 @@ public partial class Minefield : UserControl
     {
         ShowBoard(game.ToBoard());   // restored before listening, so restoring doesn't count as moves
 
-        _time_before = TimeSpan.FromSeconds(game.ElapsedSeconds);
+        _timeBefore = TimeSpan.FromSeconds(game.ElapsedSeconds);
         _clock.Start();   // the game was running, so the timer continues
         _timer.Start();
         ShowTime();
@@ -486,27 +492,37 @@ public partial class Minefield : UserControl
     /// <param name="board">Its board, restored with <see cref="SavedEndlessGame.ToBoard"/>.</param>
     private void ContinueEndlessGame(SavedEndlessGame game, InfiniteFieldMatrix board)
     {
-        _endless_density = game.DensityPercent;
-        _endless_generator = game.Generator;
+        _endlessDensity = game.DensityPercent;
+        _endlessGenerator = game.Generator;
         ShowBoard(board);
-        BoardView.ShowCell(game.ViewRow, game.ViewColumn, game.ViewZoom);
+        bool usable = double.IsFinite(game.ViewRow) && double.IsFinite(game.ViewColumn)
+                      && double.IsFinite(game.ViewZoom) && game.ViewZoom > 0;
+        if (usable)
+        {
+            BoardView.ShowCell(game.ViewRow, game.ViewColumn, game.ViewZoom);   // otherwise it shows cell (0, 0)
+        }
 
-        _time_before = TimeSpan.FromSeconds(game.ElapsedSeconds);
+        _timeBefore = TimeSpan.FromSeconds(game.ElapsedSeconds);
         _clock.Start();   // the game was running, so the timer continues
         _timer.Start();
         ShowTime();
     }
 
     /// <summary>
-    /// The density and generator of the endless board shown, which may differ from <see cref="DensityPercent"/>
-    /// and <see cref="EndlessGenerator"/> once the settings change; saved with the game.
+    /// The density of the endless board shown, in percent; saved with the game. It is what
+    /// <see cref="DensityPercent"/> was when the board was made.
     /// </summary>
-    private int _endless_density = 15;
-    private GeneratorKind _endless_generator = GeneratorKind.NoGuessing;
+    private int _endlessDensity = 15;
+    /// <summary>
+    /// The generator of the endless board shown; saved with the game. It is what <see cref="EndlessGenerator"/>
+    /// was when the board was made.
+    /// </summary>
+    private GeneratorKind _endlessGenerator = GeneratorKind.NoGuessing;
 
     /// <summary>
-    /// Shows the counters on the left. A finite board: the bombs left (bombs minus flags). An endless board:
-    /// the safe clicks in a row, and next to it the best streak of this game.
+    /// Shows the counters on the left. A finite board: the bombs left (bombs minus flags), and the best streak
+    /// counter is hidden. An endless board: the safe clicks in a row (the bombs hit in its tooltip), and next to it
+    /// the best streak of this game.
     /// </summary>
     private void UpdateCounter()
     {

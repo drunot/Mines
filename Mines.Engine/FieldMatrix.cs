@@ -5,18 +5,32 @@ using Mines.Generators;
 namespace Mines;
 
 /// <summary>
-/// The Minesweeper board: a grid of <see cref="Field"/>s indexed by row and column, plus the game
+/// A finite Minesweeper board: a grid of <see cref="Field"/>s indexed by row and column, plus the game
 /// state (bombs left, won/lost).
 /// </summary>
+/// <remarks>
+/// Also used as one chunk of an <see cref="InfiniteFieldMatrix"/>, and as the window copy of 3 by 3 chunks
+/// that an infinite board is solved in.
+/// </remarks>
 public class FieldMatrix : IBoard
 {
+    /// <summary>
+    /// The owner of the fields of a finite board: finds neighbours inside the board, runs the cascade, keeps
+    /// the counters and ends the game when a bomb is revealed. Chunks of an infinite board use the infinite
+    /// board's owner instead.
+    /// </summary>
     class FieldOwner : IFieldOwner
     {
+        /// <summary>
+        /// Creates the owner for <paramref name="fieldMatrix"/>.
+        /// </summary>
+        /// <param name="fieldMatrix">The board the fields belong to.</param>
         public FieldOwner(FieldMatrix fieldMatrix)
         {
             _matrix = fieldMatrix;
         }
 
+        /// <inheritdoc/>
         public Field? FieldAt(long row, long column)
         {
             if (row >= _matrix._rows || row < 0 || column >= _matrix.Columns || column < 0)
@@ -27,9 +41,13 @@ public class FieldMatrix : IBoard
         }
 
         /// <inheritdoc/>
+        /// <remarks>
+        /// A revealed cell without neighbouring bombs reveals its neighbours; a revealed bomb reveals every
+        /// unflagged bomb and loses the game.
+        /// </remarks>
         public void OnRevealed(Field field)
         {
-            _matrix._fields_left += field.Hidden ? 1 : -1;   // the field can also be hidden again
+            _matrix._fieldsLeft += field.Hidden ? 1 : -1;   // the field can also be hidden again
             if (field.Hidden)
             {
                 _matrix.FieldChanged?.Invoke(_matrix, EventArgs.Empty);
@@ -46,14 +64,14 @@ public class FieldMatrix : IBoard
             }
             if (field.IsBomb)
             {
-                foreach (Field grid_field in _matrix.Fields)
+                foreach (Field gridField in _matrix.Fields)
                 {
-                    if (grid_field.IsBomb && !grid_field.Flagged)
+                    if (gridField.IsBomb && !gridField.Flagged)
                     {
-                        grid_field.Hidden = false;
+                        gridField.Hidden = false;
                     }
                 }
-                _matrix._game_lost = true;
+                _matrix._gameLost = true;
             }
             _matrix.FieldChanged?.Invoke(_matrix, EventArgs.Empty);
         }
@@ -64,26 +82,28 @@ public class FieldMatrix : IBoard
 
             if (field.Flagged == true)
             {
-                _matrix._fields_left -= 1;
-                _matrix._bombs_left -= 1;
+                _matrix._fieldsLeft -= 1;
+                _matrix._bombsLeft -= 1;
             }
             else
             {
-                _matrix._fields_left += 1;
-                _matrix._bombs_left += 1;
+                _matrix._fieldsLeft += 1;
+                _matrix._bombsLeft += 1;
             }
             _matrix.FieldChanged?.Invoke(_matrix, EventArgs.Empty);
         }
+
+        /// <summary>The board the fields belong to.</summary>
         private readonly FieldMatrix _matrix;
 
     }
 
     /// <summary>Set once a bomb has been revealed.</summary>
-    bool _game_lost = false;
+    bool _gameLost = false;
     /// <summary>Whether the game is lost: a bomb has been revealed.</summary>
     public bool GameLost
     {
-        get => _game_lost;
+        get => _gameLost;
     }
 
     /// <summary>
@@ -91,12 +111,13 @@ public class FieldMatrix : IBoard
     /// </summary>
     public bool GameWon
     {
-        get => !_game_lost && _fields.Cast<Field>().All((Field f) => f.IsBomb || !f.Hidden);
+        get => !_gameLost && _fields.Cast<Field>().All(f => f.IsBomb || !f.Hidden);
     }
 
-
-    private int _bombs_left;
-    private int _fields_left;
+    /// <summary>Backing field for <see cref="BombsLeft"/>.</summary>
+    private int _bombsLeft;
+    /// <summary>Backing field for <see cref="FieldsLeft"/>.</summary>
+    private int _fieldsLeft;
 
     /// <summary>
     /// The number of bombs minus the number of flags placed, like the counter in classic Minesweeper.
@@ -104,7 +125,7 @@ public class FieldMatrix : IBoard
     /// </summary>
     public int BombsLeft
     {
-        get => _bombs_left;
+        get => _bombsLeft;
     }
 
     /// <summary>
@@ -112,9 +133,8 @@ public class FieldMatrix : IBoard
     /// </summary>
     public int FieldsLeft
     {
-        get => _fields_left;
+        get => _fieldsLeft;
     }
-
 
     /// <summary>
     /// Creates an empty board whose bombs are placed by <paramref name="generator"/> on the first call to
@@ -122,16 +142,16 @@ public class FieldMatrix : IBoard
     /// </summary>
     /// <param name="rows">The number of rows.</param>
     /// <param name="columns">The number of columns.</param>
-    /// <param name="bomb_count">The number of bombs to place.</param>
+    /// <param name="bombCount">The number of bombs to place.</param>
     /// <param name="generator">The generator that places the bombs.</param>
-    public FieldMatrix(int rows, int columns, int bomb_count, IMatrixGenerator generator)
+    public FieldMatrix(int rows, int columns, int bombCount, IMatrixGenerator generator)
     {
         _fields = new Field[rows, columns];
         _rows = rows;
         _columns = columns;
 
-        _bombs_left = bomb_count;
-        _fields_left = _rows * _columns;
+        _bombsLeft = bombCount;
+        _fieldsLeft = _rows * _columns;
         _generator = generator;
         var fieldOwner = new FieldOwner(this);
 
@@ -144,41 +164,41 @@ public class FieldMatrix : IBoard
         }
     }
 
-    // WORK IN PROGRESS CONSTRICTOR FOR INFINITE FIELD
     /// <summary>
-    /// Creates one chunk of an infinite board: a square of <paramref name="chunk_size"/> by
-    /// <paramref name="chunk_size"/> hidden fields without bombs. The infinite board places them with
+    /// Creates one chunk of an infinite board: a square of <paramref name="chunkSize"/> by
+    /// <paramref name="chunkSize"/> hidden fields without bombs. The infinite board places them with
     /// <see cref="ApplyBombs"/>.
     /// </summary>
     /// <remarks>
-    /// The fields get global positions: chunk (<paramref name="chunk_idx_r"/>, <paramref name="chunk_idx_c"/>)
-    /// starts at row <c>chunk_size * chunk_idx_r</c> and column <c>chunk_size * chunk_idx_c</c>, so chunk
-    /// (-1, 0) starts at row -<paramref name="chunk_size"/>. Their <see cref="Field.Index"/> stays local to
+    /// The fields get global positions: chunk (<paramref name="chunkIdxR"/>, <paramref name="chunkIdxC"/>)
+    /// starts at row <c>chunkSize * chunkIdxR</c> and column <c>chunkSize * chunkIdxC</c>, so chunk
+    /// (-1, 0) starts at row -<paramref name="chunkSize"/>. Their <see cref="Field.Index"/> stays local to
     /// the chunk.
     /// </remarks>
-    /// <param name="chunk_size">The number of rows and columns of the chunk.</param>
-    /// <param name="chunk_idx_r">The chunk's row among the chunks; may be negative.</param>
-    /// <param name="chunk_idx_c">The chunk's column among the chunks; may be negative.</param>
-    /// <param name="chunk_bomb_count">The number of bombs the chunk will get, for <see cref="BombsLeft"/>.</param>
+    /// <param name="chunkSize">The number of rows and columns of the chunk.</param>
+    /// <param name="chunkIdxR">The chunk's row among the chunks; may be negative.</param>
+    /// <param name="chunkIdxC">The chunk's column among the chunks; may be negative.</param>
+    /// <param name="chunkBombCount">The number of bombs the chunk will get, for <see cref="BombsLeft"/>.</param>
     /// <param name="owner">
     /// The infinite board's owner of all fields: finds fields by global position across all chunks, and handles
     /// reveals (the cascade) and flags.
     /// </param>
-    public FieldMatrix(int chunk_size, long chunk_idx_r, long chunk_idx_c, int chunk_bomb_count, IFieldOwner owner)
+    public FieldMatrix(int chunkSize, long chunkIdxR, long chunkIdxC, int chunkBombCount, IFieldOwner owner)
     {
-        _fields = new Field[chunk_size, chunk_size];
-        _rows = chunk_size;
-        _columns = chunk_size;
-        _chunk_idx_r = chunk_idx_r;
-        _chunk_idx_c = chunk_idx_c;
-        _fields_left = _rows * _columns;
-        _bombs_left = chunk_bomb_count;
+        _fields = new Field[chunkSize, chunkSize];
+        _rows = chunkSize;
+        _columns = chunkSize;
+        _chunkIdxR = chunkIdxR;
+        _chunkIdxC = chunkIdxC;
+        _fieldsLeft = _rows * _columns;
+        _bombsLeft = chunkBombCount;
 
         for (int r = 0; r < _rows; r++)
         {
             for (int c = 0; c < _columns; c++)
             {
-                _fields[r, c] = new Field(owner, chunk_size * chunk_idx_r + r, chunk_size * chunk_idx_c + c, r * _columns + c, false);
+                _fields[r, c] = new Field(owner, chunkSize * chunkIdxR + r, chunkSize * chunkIdxC + c,
+                                          r * _columns + c, false);
             }
         }
 
@@ -195,7 +215,7 @@ public class FieldMatrix : IBoard
         _rows = source.Rows;
         _columns = source.Columns;
         _fields = new Field[_rows, _columns];
-        _fields_left = _rows * _columns;
+        _fieldsLeft = _rows * _columns;
         var fieldOwner = new FieldOwner(this);
 
         for (int r = 0; r < _rows; r++)
@@ -203,12 +223,11 @@ public class FieldMatrix : IBoard
             for (int c = 0; c < _columns; c++)
             {
                 _fields[r, c] = new Field(fieldOwner, r, c, r * _columns + c, source[r, c].IsBomb);
-                _bombs_left += source[r, c].IsBomb ? 1 : 0;
+                _bombsLeft += source[r, c].IsBomb ? 1 : 0;
             }
         }
     }
 
-    // Board with bombs at chosen positions: bombs[row, column] is true for a bomb.
     /// <summary>
     /// Board with bombs at chosen positions: <c>bombs[row, column]</c> is true for a bomb. The board counts
     /// as initialized.
@@ -220,7 +239,7 @@ public class FieldMatrix : IBoard
         _rows = bombs.GetLength(0);
         _columns = bombs.GetLength(1);
         _fields = new Field[_rows, _columns];
-        _fields_left = _rows * _columns;
+        _fieldsLeft = _rows * _columns;
         var fieldOwner = new FieldOwner(this);
 
         for (int r = 0; r < _rows; r++)
@@ -228,11 +247,10 @@ public class FieldMatrix : IBoard
             for (int c = 0; c < _columns; c++)
             {
                 _fields[r, c] = new Field(fieldOwner, r, c, r * _columns + c, bombs[r, c]);
-                _bombs_left += bombs[r, c] ? 1 : 0;
+                _bombsLeft += bombs[r, c] ? 1 : 0;
             }
         }
     }
-
 
     /// <summary>
     /// Board with bombs at chosen positions and some cells already revealed, e.g. a copy of part of an infinite
@@ -246,7 +264,7 @@ public class FieldMatrix : IBoard
         _rows = bombs.GetLength(0);
         _columns = bombs.GetLength(1);
         _fields = new Field[_rows, _columns];
-        _fields_left = _rows * _columns;
+        _fieldsLeft = _rows * _columns;
         var fieldOwner = new FieldOwner(this);
 
         for (int r = 0; r < _rows; r++)
@@ -255,7 +273,7 @@ public class FieldMatrix : IBoard
             {
                 _fields[r, c] = new Field(fieldOwner, r, c, r * _columns + c, bombs[r, c]);
                 _fields[r, c].SetHiddenNoPropagate(hidden[r, c]);
-                _bombs_left += bombs[r, c] ? 1 : 0;
+                _bombsLeft += bombs[r, c] ? 1 : 0;
             }
         }
     }
@@ -263,31 +281,33 @@ public class FieldMatrix : IBoard
     /// <summary>Backing field for <see cref="Initialized"/>.</summary>
     bool _initialized = false;
 
-    // True once the bombs are placed: right away for a given layout, or on the first reveal with a generator.
     /// <summary>
     /// True once the bombs are placed: right away for a given layout, or on the first reveal with a generator.
     /// </summary>
     public bool Initialized => _initialized;
 
     /// <summary>
-    /// Places the bombs with the generator, keeping <paramref name="first_point"/> in mind. Does nothing if
-    /// the board is already initialized.
+    /// Places the bombs with the generator (if the board has one), keeping <paramref name="firstPoint"/> in mind.
+    /// Does nothing if the board is already initialized.
     /// </summary>
-    /// <param name="first_point">The first field the player reveals (X is the row, Y the column).</param>
-    public void Initialize(Point<int> first_point)
+    /// <param name="firstPoint">The first field the player reveals (X is the row, Y the column).</param>
+    public void Initialize(Point<int> firstPoint)
     {
         if (_initialized)
         {
             return;
         }
         _initialized = true;
-        _generator?.Generate(this, first_point, _bombs_left);
+        _generator?.Generate(this, firstPoint, _bombsLeft);
     }
 
     /// <summary>
-    /// Sets the bombs of every field from a layout. Used by the generators.
+    /// Sets the bombs of every field from a layout. Used by the generators and by the infinite board for its
+    /// chunks. Doesn't change <see cref="BombsLeft"/>.
     /// </summary>
-    /// <param name="bombs">The layout, indexed by the local row and column: <c>[row, column]</c> is true for a bomb.</param>
+    /// <param name="bombs">
+    /// The layout, indexed by the local row and column: <c>[row, column]</c> is true for a bomb.
+    /// </param>
     /// <exception cref="ArgumentException"><paramref name="bombs"/> doesn't have the board's size.</exception>
     public void ApplyBombs(bool[,] bombs)
     {
@@ -307,42 +327,55 @@ public class FieldMatrix : IBoard
     /// <summary>
     /// Swaps the bomb states of two fields, if exactly one of them is a bomb.
     /// </summary>
-    /// <param name="point_a">The first field (X is the row, Y the column).</param>
-    /// <param name="point_b">The second field (X is the row, Y the column).</param>
+    /// <param name="pointA">The global position of the first field (<see cref="Field.Position"/>).</param>
+    /// <param name="pointB">The global position of the second field (<see cref="Field.Position"/>).</param>
     /// <returns><c>true</c> if the bomb was moved; <c>false</c> if both or neither field is a bomb.</returns>
-    public bool SwapBombs(Point<long> point_a, Point<long> point_b)
+    public bool SwapBombs(Point<long> pointA, Point<long> pointB)
     {
-        long x_mod = _chunk_idx_r * _rows;
-        long y_mod = _chunk_idx_c * _columns;
-        int a_x = (int)(point_a.X - x_mod);
-        int a_y = (int)(point_a.Y - y_mod);
-        int b_x = (int)(point_b.X - x_mod);
-        int b_y = (int)(point_b.Y - y_mod);
+        long xMod = _chunkIdxR * _rows;
+        long yMod = _chunkIdxC * _columns;
+        int aX = (int)(pointA.X - xMod);
+        int aY = (int)(pointA.Y - yMod);
+        int bX = (int)(pointB.X - xMod);
+        int bY = (int)(pointB.Y - yMod);
 
-        if ((!_fields[a_x, a_y].IsBomb && !_fields[b_x, b_y].IsBomb) ||
-           (_fields[a_x, a_y].IsBomb && _fields[b_x, b_y].IsBomb))
+        if ((!_fields[aX, aY].IsBomb && !_fields[bX, bY].IsBomb) ||
+           (_fields[aX, aY].IsBomb && _fields[bX, bY].IsBomb))
         {
             return false;
         }
-        _fields[a_x, a_y].IsBomb = !_fields[a_x, a_y].IsBomb;
-        _fields[b_x, b_y].IsBomb = !_fields[b_x, b_y].IsBomb;
+        _fields[aX, aY].IsBomb = !_fields[aX, aY].IsBomb;
+        _fields[bX, bY].IsBomb = !_fields[bX, bY].IsBomb;
         return true;
     }
 
     /// <summary>
-    /// Raised when any field on the board is revealed or its flag changes.
+    /// Raised when a field of the board is revealed, hidden again or its flag changes, and after
+    /// <see cref="CycleMark(long, long)"/>. Not raised for a chunk of an infinite board, whose fields tell the
+    /// infinite board instead.
     /// </summary>
     public event EventHandler? FieldChanged;
 
+    /// <summary>The fields, indexed by the local row and column.</summary>
     private Field[,] _fields;
 
-    /// <summary>Places the bombs on <see cref="Initialize(Point{int})"/>; <c>null</c> for boards with a given layout.</summary>
+    /// <summary>
+    /// Places the bombs on <see cref="Initialize(Point{int})"/>; <c>null</c> for boards with a given layout and
+    /// for chunks.
+    /// </summary>
     private IMatrixGenerator? _generator;
+    /// <summary>Backing field for <see cref="Rows"/>.</summary>
     private int _rows;
+    /// <summary>Backing field for <see cref="Columns"/>.</summary>
     private int _columns;
 
-    private long _chunk_idx_r = 0;
-    private long _chunk_idx_c = 0;
+    /// <summary>
+    /// The chunk's row among the chunks of an infinite board; 0 otherwise. Turns global positions into local ones
+    /// in <see cref="SwapBombs"/>.
+    /// </summary>
+    private long _chunkIdxR = 0;
+    /// <summary>The chunk's column among the chunks of an infinite board; 0 otherwise.</summary>
+    private long _chunkIdxC = 0;
 
     /// <summary>The number of rows.</summary>
     public int Rows
@@ -357,20 +390,20 @@ public class FieldMatrix : IBoard
     }
 
     /// <summary>
-    /// The field at the given row and column.
+    /// The field at the given local row and column (the same as the global ones, except on a chunk).
     /// </summary>
-    /// <param name="row">The row of the field.</param>
-    /// <param name="column">The column of the field.</param>
+    /// <param name="row">The local row of the field.</param>
+    /// <param name="column">The local column of the field.</param>
     public Field this[int row, int column]
     {
         get => _fields[row, column];
     }
 
-
     /// <summary>
-    /// Map each field to a bool.
+    /// Maps each field to a bool.
     /// </summary>
-    /// <returns>The fields.</returns>
+    /// <param name="test">The function to apply to each field.</param>
+    /// <returns><c>[row, column]</c> is the result of <paramref name="test"/> for that field.</returns>
     private bool[,] Map(Func<Field, bool> test)
     {
         var result = new bool[Rows, Columns];
@@ -385,22 +418,16 @@ public class FieldMatrix : IBoard
     }
 
     /// <summary>
-    /// Get the fields which are bombs.
+    /// Gets the bomb layout.
     /// </summary>
-    /// <returns>The fields.</returns>
+    /// <returns><c>[row, column]</c> is true for a bomb.</returns>
     public bool[,] GetBombs() => Map(f => f.IsBomb);
 
     /// <summary>
-    /// Get the fields which are hidden.
+    /// Gets which fields are hidden.
     /// </summary>
-    /// <returns>The fields.</returns>
+    /// <returns><c>[row, column]</c> is true for a hidden field.</returns>
     public bool[,] GetHidden() => Map(f => f.Hidden);
-
-    /// <summary>
-    /// Get the fields which will change fields visible for the user and should be locked for a board fixer.
-    /// </summary>
-    /// <returns>The fields.</returns>
-    public bool[,] GetLocked() => Map(f => !f.Hidden || f.Neighbors.Any(n => !n.Hidden));
 
     // ---- IBoard: how the view plays a finite board ----
 
@@ -475,7 +502,6 @@ public class FieldMatrix : IBoard
     {
     }
 
-    // The field with the given Field.Index (row * Columns + column).
     /// <summary>
     /// The field with the given <see cref="Field.Index"/> (<c>row * Columns + column</c>).
     /// </summary>

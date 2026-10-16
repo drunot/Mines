@@ -4,38 +4,38 @@ using System;
 namespace Mines.Solving;
 
 /// <summary>
-/// "The bombs among these cells add up to sum." Cells are <see cref="Field.Index"/> values, kept sorted
+/// "The bombs among these cells add up to Sum." Cells are <see cref="Field.Index"/> values, kept sorted
 /// in a small array: equations rarely have more than 8 cells, so scanning beats hashing.
 /// </summary>
 /// <remarks>
-/// Value equality (<see cref="Equals(Equation)"/>) compares the sum and the cells; use
+/// Value equality (<see cref="Equals(Equation)"/>) compares the Sum and the cells; use
 /// <see cref="EquationIdentity"/> to compare by identity.
 /// </remarks>
 public class Equation : IEquatable<Equation>
 {
     /// <summary>
-    /// Creates an empty equation with sum 0.
+    /// Creates an empty equation with Sum 0.
     /// </summary>
     /// <param name="capacity">The number of cells to reserve room for.</param>
     public Equation(int capacity = 8)
     {
-        sum = 0;
+        Sum = 0;
         _cells = new int[capacity];
     }
 
     /// <summary>
-    /// Creates a copy of <paramref name="equation"/> with the same cells and sum (but a new <see cref="Id"/>).
+    /// Creates a copy of <paramref name="equation"/> with the same cells and Sum (but a new <see cref="Id"/>).
     /// </summary>
     /// <param name="equation">The equation to copy.</param>
     public Equation(Equation equation)
     {
-        sum = equation.sum;
+        Sum = equation.Sum;
         _cells = equation.Cells.ToArray();
         _count = equation._count;
     }
 
     /// <summary>The number of bombs among <see cref="Cells"/>.</summary>
-    public int sum;
+    public int Sum { get; set; }
 
     /// <summary>The number of cells in the equation.</summary>
     public int Count => _count;
@@ -83,7 +83,7 @@ public class Equation : IEquatable<Equation>
     public bool Contains(int cell) => Array.BinarySearch(_cells, 0, _count, cell) >= 0;
 
     /// <summary>
-    /// Removes a cell. The sum is not changed.
+    /// Removes a cell. The Sum is not changed.
     /// </summary>
     /// <param name="cell">The <see cref="Field.Index"/> of the cell.</param>
     /// <returns><c>true</c> if the cell was in the equation.</returns>
@@ -147,23 +147,23 @@ public class Equation : IEquatable<Equation>
             }
             difference._cells[difference._count++] = _cells[i];   // stays sorted
         }
-        difference.sum = sum - smaller.sum;
+        difference.Sum = Sum - smaller.Sum;
         return difference;
     }
 
     /// <summary>
-    /// Value equality: same sum and same cells.
+    /// Value equality: same Sum and same cells.
     /// </summary>
     /// <param name="other">The equation to compare with.</param>
-    /// <returns><c>true</c> if both equations have the same sum and cells.</returns>
-    public bool Equals(Equation? other) => other is not null && sum == other.sum && Cells.SequenceEqual(other.Cells);
+    /// <returns><c>true</c> if both equations have the same Sum and cells.</returns>
+    public bool Equals(Equation? other) => other is not null && Sum == other.Sum && Cells.SequenceEqual(other.Cells);
     /// <inheritdoc/>
     public override bool Equals(object? other) => other is Equation equation && Equals(equation);
     /// <inheritdoc/>
     public override int GetHashCode()
     {
         var hash = new HashCode();
-        hash.Add(sum);
+        hash.Add(Sum);
         foreach (int cell in Cells)
         {
             hash.Add(cell);
@@ -174,26 +174,26 @@ public class Equation : IEquatable<Equation>
     /// <summary>Value equality, see <see cref="Equals(Equation)"/>.</summary>
     /// <param name="left">The first equation; must not be <c>null</c>.</param>
     /// <param name="right">The second equation.</param>
-    /// <returns><c>true</c> if both equations have the same sum and cells.</returns>
+    /// <returns><c>true</c> if both equations have the same Sum and cells.</returns>
     public static bool operator ==(Equation left, Equation right) => left.Equals(right);
     /// <summary>Value inequality, see <see cref="Equals(Equation)"/>.</summary>
     /// <param name="left">The first equation; must not be <c>null</c>.</param>
     /// <param name="right">The second equation.</param>
-    /// <returns><c>true</c> if the equations differ in sum or cells.</returns>
+    /// <returns><c>true</c> if the equations differ in Sum or cells.</returns>
     public static bool operator !=(Equation left, Equation right) => !left.Equals(right);
 
     /// <summary>
     /// Bit r is set while this equation waits in <see cref="EquationList"/>'s queue for rule r
     /// (see <see cref="Rule"/>).
     /// </summary>
-    internal byte QueuedRules;
+    internal byte QueuedRules { get; set; }
 
     /// <summary>
     /// Unique per equation; a cheap identity hash for <see cref="EquationIdentity"/>.
     /// </summary>
-    public readonly int Id = s_next_id++;
+    public readonly int Id = s_nextId++;
     /// <summary>The <see cref="Id"/> for the next equation.</summary>
-    private static int s_next_id = 0;
+    private static int s_nextId = 0;
 
     /// <summary>The cells, sorted ascending; only the first <see cref="_count"/> entries are used.</summary>
     private int[] _cells;
