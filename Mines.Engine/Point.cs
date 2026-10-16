@@ -6,7 +6,7 @@ namespace Mines;
 /// A pair of coordinates. On the board, <see cref="X"/> is the row and <see cref="Y"/> the column.
 /// </summary>
 /// <typeparam name="T">The coordinate type.</typeparam>
-public class Point<T> : IEquatable<Point<T>> 
+public struct Point<T> : IEquatable<Point<T>> 
     where T : IEqualityOperators<T, T, bool>
 {
     /// <summary>
@@ -24,7 +24,7 @@ public class Point<T> : IEquatable<Point<T>>
     /// </summary>
     /// <param name="other">The point to compare with.</param>
     /// <returns><c>true</c> if <paramref name="other"/> is not <c>null</c> and has the same coordinates.</returns>
-    public bool Equals(Point<T>? other) => other is not null && X == other.X && Y == other.Y;
+    public bool Equals(Point<T> other) => X == other.X && Y == other.Y;
 
     /// <summary>The X coordinate; on the board, the row.</summary>
     public T X { get; set; }

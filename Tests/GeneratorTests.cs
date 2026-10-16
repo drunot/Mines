@@ -31,7 +31,7 @@ public class GeneratorTests
         var first = new Point<int>(rows / 2, columns / 2);
         for (int seed = 0; seed < SeedCount; ++seed)
         {
-            bool[,] bombs = Create(generator_name, seed).Generate(rows, columns, first, bomb_count);
+            bool[,] bombs = Boards.Generate(Create(generator_name, seed), rows, columns, first, bomb_count);
             string where = $"{generator_name} {rows}x{columns}/{bomb_count} seed {seed}";
 
             Assert.True(bomb_count == bombs.Cast<bool>().Count(b => b), $"wrong bomb count ({where})");

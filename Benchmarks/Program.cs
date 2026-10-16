@@ -89,7 +89,8 @@ public static class Boards
             Field? start = matrix.Fields.Cast<Field>().FirstOrDefault(f => !f.IsBomb && f.Number is null);
             if (start is not null)
             {
-                boards.Add(new StartBoard(matrix, start.Position.X, start.Position.Y));
+                Point<int> local = matrix.LocalPosition(start);
+                boards.Add(new StartBoard(matrix, local.X, local.Y));
             }
         }
         return boards;

@@ -19,10 +19,11 @@ abstract class SolvingStrategyBase : ISolvingStrategy
     /// through cells without neighbouring bombs. Visited cells are collected in <paramref name="cells"/>.
     /// </summary>
     /// <param name="fieldMatrix">The board to read.</param>
+    /// <param name="list">The equation list, which knows which revealed cells give an equation.</param>
     /// <param name="location">The <see cref="Field.Index"/> of the revealed cell to start from.</param>
     /// <param name="cells">Receives the revealed cells visited; cells already in it are skipped.</param>
     /// <returns>The non-empty equations of the visited cells that have neighbouring bombs.</returns>
-    protected static List<Equation> createEquations(FieldMatrix fieldMatrix, int location, HashSet<int> cells)
+    protected static List<Equation> createEquations(FieldMatrix fieldMatrix, EquationList list, int location, HashSet<int> cells)
     {
         var equations = new List<Equation>();
         var to_visit = new Stack<int>();
@@ -30,9 +31,9 @@ abstract class SolvingStrategyBase : ISolvingStrategy
         while (to_visit.TryPop(out int current))
         {
             Field field = fieldMatrix.FieldAt(current);
-            if (field.Hidden || !cells.Add(current))
+            if (field.Hidden || !cells.Add(current) || !list.GivesEquation(field))
             {
-                continue;
+                continue;   // (a cell that shows no number also opens nothing)
             }
 
             var equation = new Equation();
@@ -45,7 +46,7 @@ abstract class SolvingStrategyBase : ISolvingStrategy
                 }
                 if (neighbor.IsBomb)
                 {
-                    equation.sum += neighbor.Flagged ? 0 : 1;
+                    equation.sum += neighbor.Hidden && !neighbor.Flagged ? 1 : 0;   // flags and revealed bombs are known
                     number += 1;
                 }
             }
@@ -95,7 +96,7 @@ abstract class SolvingStrategyBase : ISolvingStrategy
         field.Hidden = false;
 
         var revealed_cells = new HashSet<int>();
-        foreach (Equation new_equation in createEquations(fieldMatrix, cell, revealed_cells))
+        foreach (Equation new_equation in createEquations(fieldMatrix, equations, cell, revealed_cells))
         {
             equations.Add(new_equation);
         }

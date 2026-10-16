@@ -35,19 +35,25 @@ public class FieldChangedEventArgs : EventArgs
 public class Field
 {
     /// <summary>
-    /// Creates a hidden, unflagged field at the given row and column of <paramref name="parent"/>.
+    /// Creates a hidden, unflagged field at the given global row and column.
     /// </summary>
-    /// <param name="parent">The board this field belongs to; its <see cref="FieldMatrix.Columns"/> must already be set.</param>
-    /// <param name="own_x">The row of this field.</param>
-    /// <param name="own_y">The column of this field.</param>
+    /// <param name="fieldOwner">
+    /// The board the field belongs to: finds fields by global position (for this field's
+    /// <see cref="Neighbors"/>, also across chunk borders on an infinite board) and is told when the field is
+    /// revealed or its flag changes.
+    /// </param>
+    /// <param name="own_x">The global row of this field (on a normal board, the same as its row on the board).</param>
+    /// <param name="own_y">The global column of this field (on a normal board, the same as its column on the board).</param>
+    /// <param name="index">
+    /// The field's <see cref="Index"/>: <c>row * Columns + column</c> with the row and column inside its own
+    /// <see cref="FieldMatrix"/>, not the global ones.
+    /// </param>
     /// <param name="is_bomb">Whether this field holds a bomb.</param>
-    /// <param name="fieldOwner">Optional owner notified when the field is revealed or its flag changes.</param>
-    public Field(FieldMatrix parent, int own_x, int own_y, bool is_bomb = false, IFieldOwner? fieldOwner = null)
+    public Field(IFieldOwner fieldOwner, long own_x, long own_y, int index, bool is_bomb = false)
     {
-        _pos = new Point<int>(own_x, own_y);
-        _parent = parent;
+        _pos = new Point<long>(own_x, own_y);
         IsBomb = is_bomb;
-        _index = own_x * parent.Columns + own_y;
+        _index = index;
         _fieldOwner = fieldOwner;
     }
 
@@ -58,21 +64,15 @@ public class Field
     public int Index => _index;
 
     private readonly int _index;
-    private FieldMatrix _parent;
-
-    /// <summary>The board this field belongs to.</summary>
-    public FieldMatrix Parent
-    {
-        get => _parent;
-    }
 
     /// <summary>
-    /// The position of this field on the board: <see cref="Point{T}.X"/> is the row,
-    /// <see cref="Point{T}.Y"/> the column.
+    /// The global position of this field: <see cref="Point{T}.X"/> is the row, <see cref="Point{T}.Y"/> the
+    /// column. On a normal board it is the same as the position on the board; on an infinite board it may be
+    /// negative. Use <see cref="FieldMatrix.LocalPosition"/> to index the field's own <see cref="FieldMatrix"/>.
     /// </summary>
-    public Point<int> Position { get => _pos; }
+    public Point<long> Position { get => _pos; }
 
-    private Point<int> _pos;
+    private Point<long> _pos;
 
 
     /// <summary>Whether this field holds a bomb.</summary>
@@ -99,7 +99,7 @@ public class Field
     /// </summary>
     /// <remarks>
     /// Setting it raises <see cref="FieldChanged"/> and notifies the owner. Revealing a flagged field
-    /// does not reveal it; it only removes the flag.
+    /// does not reveal it; it only removes the flag. Revealing a question-marked field removes the question mark.
     /// </remarks>
     public bool Hidden
     {
@@ -109,10 +109,14 @@ public class Field
             {
                 return;
             }
-            if (!value && _hidden && _flagged)
+            if (!value && _hidden && Flagged)
             {
                 Flagged = false;
                 return;
+            }
+            if (!value)
+            {
+                _mark = Mark.None;   // a revealed field has no mark (only a question mark can be left here)
             }
             _hidden = value;
             FieldChanged?.Invoke(this, new FieldChangedEventArgs(null, _hidden, IsBomb));
@@ -121,57 +125,118 @@ public class Field
     }
 
     /// <summary>
+    /// Sets <see cref="Hidden"/> without telling anyone: no event, no owner notification, no cascade. For building
+    /// a copy of a board in a given state, such as the window an infinite board is solved in.
+    /// </summary>
+    /// <param name="hidden">Whether the field is hidden.</param>
+    public void SetHiddenNoPropagate(bool hidden)
+    {
+        _hidden = hidden;
+    }
+
+    /// <summary>
     /// Collects the up to eight fields around this one, staying inside the board.
     /// </summary>
     /// <returns>The neighbouring fields, in row-major order.</returns>
     private Field[] ComputeNeighbors()
     {
-        var x_min = Math.Max(_pos.X - 1, 0);
-        var x_max = Math.Min(_pos.X + 1, _parent.Rows - 1);
-        var y_min = Math.Max(_pos.Y - 1, 0);
-        var y_max = Math.Min(_pos.Y + 1, _parent.Columns - 1);
-        var result = new Field[(x_max - x_min + 1) * (y_max - y_min + 1) - 1];
+        var result = new Field[8];
         int i = 0;
-        for (int x_cor = x_min; x_cor <= x_max; ++x_cor)
+        for (long x_cor = _pos.X - 1; x_cor <= _pos.X + 1; ++x_cor)
         {
-            for (int y_cor = y_min; y_cor <= y_max; ++y_cor)
+            for (long y_cor = _pos.Y - 1; y_cor <= _pos.Y + 1; ++y_cor)
             {
                 if (x_cor == _pos.X && y_cor == _pos.Y)
                 {
                     continue;
                 }
-                result[i++] = _parent[x_cor, y_cor];
+                var field = _fieldOwner.FieldAt(x_cor, y_cor);
+                if (field is not null)
+                {
+
+                    result[i++] = field;
+                }
             }
         }
-        return result;
+
+        return result[..i];   
     }
 
     private bool _hidden = true;
 
     /// <summary>
-    /// Raised when <see cref="Hidden"/> or <see cref="Flagged"/> changes.
+    /// Raised when <see cref="Hidden"/> or <see cref="Mark"/> changes.
     /// </summary>
     public event EventHandler<FieldChangedEventArgs>? FieldChanged;
 
 
-    private bool _flagged = false;
+    /// <summary>Backing field for <see cref="Mark"/>.</summary>
+    private Mark _mark = Mark.None;
 
     /// <summary>
-    /// Whether this field is flagged as a bomb. Only hidden fields can be flagged or unflagged;
-    /// setting it on a revealed field does nothing.
+    /// The player's mark on this field: none, a flag or a question mark. Only a hidden field can be marked;
+    /// setting it on a revealed field does nothing, and revealing a field removes its mark.
     /// </summary>
-    public bool Flagged
+    /// <remarks>
+    /// Raises <see cref="FieldChanged"/>. The owner is told (<see cref="IFieldOwner.OnFlagChanged"/>) only when
+    /// the field becomes flagged or stops being flagged, since only flags count for anything.
+    /// </remarks>
+    public Mark Mark
     {
-        get => _flagged;
+        get => _mark;
         set
         {
-            if (!_hidden || _flagged == value)
+            if (!_hidden || _mark == value)
             {
                 return;
             }
-            _flagged = value;
-            FieldChanged?.Invoke(this, new FieldChangedEventArgs(_flagged, null, IsBomb));
-            _fieldOwner?.OnFlagChanged(value);
+            bool was_flagged = _mark == Mark.Flag;
+            _mark = value;
+            FieldChanged?.Invoke(this, new FieldChangedEventArgs(Flagged, null, IsBomb));
+            if (was_flagged != Flagged)
+            {
+                _fieldOwner.OnFlagChanged(this);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Whether this field is flagged as a bomb: a shortcut for <see cref="Mark"/> being <see cref="Mark.Flag"/>.
+    /// Setting it to <c>false</c> only removes a flag, not a question mark.
+    /// </summary>
+    public bool Flagged
+    {
+        get => _mark == Mark.Flag;
+        set
+        {
+            if (value)
+            {
+                Mark = Mark.Flag;
+            }
+            else if (_mark == Mark.Flag)
+            {
+                Mark = Mark.None;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Whether this field has a question mark: a shortcut for <see cref="Mark"/> being <see cref="Mark.Question"/>.
+    /// Setting it to <c>false</c> only removes a question mark, not a flag.
+    /// </summary>
+    public bool Questioned
+    {
+        get => _mark == Mark.Question;
+        set
+        {
+            if (value)
+            {
+                Mark = Mark.Question;
+            }
+            else if (_mark == Mark.Question)
+            {
+                Mark = Mark.None;
+            }
         }
     }
 
@@ -184,5 +249,5 @@ public class Field
     private Field[]? _neighbors;
 
     /// <summary>Notified when this field is revealed or its flag changes; may be <c>null</c>.</summary>
-    private IFieldOwner? _fieldOwner;
+    private IFieldOwner _fieldOwner;
 }

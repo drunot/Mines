@@ -148,12 +148,14 @@ public class EdgeBoardFixer : iBoardFixer
     /// chosen edge changes. Returns <c>false</c> if no revealed number can be fixed, or if there aren't enough
     /// such hidden fields.
     /// </remarks>
-    public bool GetBoardChanges(FieldMatrix board, [NotNullWhen(true)] out List<(Point<int>, Point<int>)>? swaps)
+    public bool GetBoardChanges(FieldMatrix board, [NotNullWhen(true)] out List<(Point<long>, Point<long>)>? swaps, bool[,]? locked = null)
     {
         List<FieldCandidate> candidates = new List<FieldCandidate>();
         foreach (Field f in board.Fields)
         {
-            if (f.Number is not null && !f.Hidden)
+            var fieldLocked = locked is null ? false : locked[f.Position.X,f.Position.Y];
+
+            if (f.Number is not null && !f.Hidden && !fieldLocked)
             {
                 candidates.Add(new FieldCandidate(f));
             }
@@ -191,7 +193,7 @@ public class EdgeBoardFixer : iBoardFixer
                 swaps = null;
                 return false;
             }
-            swaps = new List<(Point<int>, Point<int>)>();
+            swaps = new List<(Point<long>, Point<long>)>();
 
             Field[] fields_shuffled = available_fields.ToArray();
             _rand.Shuffle(fields_shuffled);
@@ -223,7 +225,7 @@ public class EdgeBoardFixer : iBoardFixer
                 swaps = null;
                 return false;
             }
-            swaps = new List<(Point<int>, Point<int>)>();
+            swaps = new List<(Point<long>, Point<long>)>();
 
             Field[] fields_shuffled = available_fields.ToArray();
             _rand.Shuffle(fields_shuffled);

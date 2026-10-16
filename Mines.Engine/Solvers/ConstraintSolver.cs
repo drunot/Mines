@@ -17,17 +17,30 @@ namespace Mines.Solving;
 public class ConstraintSolver : IResumableSolver
 {
     /// <summary>
-    /// Builds an equation for every revealed field: its hidden, unflagged neighbours add up to the number
-    /// of unflagged bombs around it.
+    /// Whether the global equation (the number of bombs left) may be used. Turn it off when solving a part of
+    /// a larger board, such as a window of an infinite board.
+    /// </summary>
+    public bool UseGlobalEquation { get; init; } = true;
+
+    /// <summary>
+    /// Whether revealed cells on the board's edge give no equation. Turn it on when solving a part of a larger
+    /// board: such cells have neighbours outside the part, so their number here isn't the one the player sees.
+    /// </summary>
+    public bool IgnoreEdges { get; init; }
+
+    /// <summary>
+    /// Builds an equation for every revealed field that shows a number (see
+    /// <see cref="EquationList.GivesEquation"/>): its hidden, unflagged neighbours add up to the number of
+    /// hidden, unflagged bombs around it.
     /// </summary>
     /// <param name="matrix">The board to read.</param>
     /// <returns>A new <see cref="EquationList"/> holding the equations.</returns>
-    static EquationList CollectEquations(FieldMatrix matrix)
+    EquationList CollectEquations(FieldMatrix matrix)
     {
-        EquationList return_value = new EquationList(matrix);
+        EquationList return_value = new EquationList(matrix) { UseGlobalEquation = UseGlobalEquation, IgnoreEdges = IgnoreEdges };
         foreach (Field f in matrix.Fields)
         {
-            if (f.Hidden)
+            if (f.Hidden || !return_value.GivesEquation(f))
             {
                 continue;
             }
@@ -38,9 +51,9 @@ public class ConstraintSolver : IResumableSolver
                 {
                     equation.Add(neighbor.Index);
                 }
-                if (neighbor.IsBomb && !neighbor.Flagged)
+                if (neighbor.IsBomb && neighbor.Hidden && !neighbor.Flagged)
                 {
-                    equation.sum += 1;  // equals f.Number - Flagged, counted here to avoid a second pass.
+                    equation.sum += 1;  // f.Number minus flags and revealed bombs, counted here to avoid a second pass.
                 }
             }
             return_value.Add(equation);
@@ -155,7 +168,7 @@ public class ConstraintSolver : IResumableSolver
     /// player would see) rather than patched. Does nothing if <see cref="Solve(FieldMatrix)"/> hasn't been
     /// called yet.
     /// </remarks>
-    public void SwapAndContinue(List<(Point<int>, Point<int>)> swaps)
+    public void SwapAndContinue(List<(Point<long>, Point<long>)> swaps)
     {
         if (_matrix is null || _equations is null)
         {

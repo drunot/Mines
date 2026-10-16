@@ -17,23 +17,31 @@ namespace Mines;
 /// size, not the board size.
 /// </summary>
 /// <remarks>
+/// <para>
 /// Mouse wheel zooms around the pointer; dragging (left or middle button) pans.
-/// Left click reveals (and chords on a revealed number), right click cycles flag -&gt; question mark -&gt; nothing.
-/// Inside a ScrollViewer it shows scrollbars (<see cref="ILogicalScrollable"/>), while still drawing only the
-/// visible cells.
+/// Left click reveals (and chords on a revealed number), right click cycles flag -&gt; question mark -&gt; nothing;
+/// the board (<see cref="IBoard"/>) applies the rules.
+/// </para>
+/// <para>
+/// Cells start at <see cref="DefaultCellMillimetres"/> mm. A finite board can be zoomed out until it fits and
+/// shows scrollbars inside a ScrollViewer (<see cref="ILogicalScrollable"/>); an infinite board has no
+/// scrollbars and pans freely, and the view tells it which cells are visible (<see cref="IBoard.SetVisibleArea"/>).
+/// </para>
 /// </remarks>
 public class BoardView : Control, ILogicalScrollable
 {
     /// <summary>
     /// Defines the <see cref="Board"/> property.
     /// </summary>
-    public static readonly StyledProperty<FieldMatrix?> BoardProperty =
-        AvaloniaProperty.Register<BoardView, FieldMatrix?>(nameof(Board));
+    public static readonly StyledProperty<IBoard?> BoardProperty =
+        AvaloniaProperty.Register<BoardView, IBoard?>(nameof(Board));
 
     /// <summary>
-    /// The board shown. Setting a new board clears the question marks and resets the view to fit the board.
+    /// The board shown: finite or infinite. Setting a new board resets the zoom to
+    /// <see cref="DefaultCellMillimetres"/> and shows the top-left corner of a finite board, or cell (0, 0) in the
+    /// middle of an infinite one.
     /// </summary>
-    public FieldMatrix? Board
+    public IBoard? Board
     {
         get => GetValue(BoardProperty);
         set => SetValue(BoardProperty, value);
@@ -89,21 +97,43 @@ public class BoardView : Control, ILogicalScrollable
     /// Width of a tile's bevel.
     /// </summary>
     private const double BevelWidth = TileShapes.BevelWidth;
-    private const double MaxZoom = 4;        // zooming in stops here (or at the fit, if that is larger)
     private const double DragThreshold = 4;  // pixels the pointer may move before a press becomes a pan
+
+    /// <summary>
+    /// The size of a cell (tile plus gap) at the start, in millimetres.
+    /// </summary>
+    public const double DefaultCellMillimetres = 5;
+
+    /// <summary>
+    /// The zoom at which a cell is <see cref="DefaultCellMillimetres"/> mm. Avalonia measures in device-independent
+    /// units of 1/96 inch (the operating system's scaling maps them to the screen), so this is
+    /// 5 mm = 5 / 25.4 * 96 units, divided by the cell pitch.
+    /// </summary>
+    public static double DefaultZoom => DefaultCellMillimetres / 25.4 * 96 / CellPitch;
+
+    /// <summary>
+    /// Zooming in stops at cells this many times <see cref="DefaultCellMillimetres"/>.
+    /// </summary>
+    private const double MaxZoomFactor = 4;
+
+    /// <summary>
+    /// Zooming out on an infinite board stops at cells this share of <see cref="DefaultCellMillimetres"/>. It also
+    /// limits how many cells are visible, and so how far a cascade can open at once.
+    /// </summary>
+    private const double InfiniteMinZoomFactor = 0.5;
 
     /// <summary>
     /// Screen pixels per board unit.
     /// </summary>
-    private double _zoom = 1;
-    private bool _fitted = true;             // at the fit zoom; stays fitted when the size changes
+    private double _zoom = DefaultZoom;
     private Vector _offset;                  // board point shown at the top-left of the visible area
+    private Vector? _center_target;          // board point to put in the middle once the view's size is known
 
     // ---- Board ----
 
     /// <summary>
     /// Reacts to <see cref="IsLocked"/> (drops the hover and press state when locking) and to
-    /// <see cref="Board"/> (follows the new board's changes, clears the question marks and resets the view).
+    /// <see cref="Board"/> (follows the new board's changes and resets the view).
     /// </summary>
     /// <param name="change">The property change.</param>
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
@@ -118,18 +148,24 @@ public class BoardView : Control, ILogicalScrollable
         }
         if (change.Property == BoardProperty)
         {
-            if (change.OldValue is FieldMatrix old_board)
+            if (change.OldValue is IBoard old_board)
             {
                 old_board.FieldChanged -= OnBoardChanged;
             }
-            if (change.NewValue is FieldMatrix new_board)
+            if (change.NewValue is IBoard new_board)
             {
                 new_board.FieldChanged += OnBoardChanged;
             }
-            _questioned.Clear();
+            _zoom = DefaultZoom;
             _offset = default;
-            _fitted = true;
-            RaiseScrollInvalidated(EventArgs.Empty);
+            _hover_cell = null;
+            _pressed_cell = null;
+            _center_target = IsInfinite ? new Vector(TileSize / 2, TileSize / 2) : null;   // cell (0, 0)
+            if (_center_target is not null && _viewport.Width > 0)
+            {
+                ApplyCenterTarget();
+            }
+            ClampOffset(_viewport);
             InvalidateMeasure();
             InvalidateVisual();
         }
@@ -144,36 +180,41 @@ public class BoardView : Control, ILogicalScrollable
 
     private TilePalette? _palette;   // colours for the current theme
 
-    /// <summary>
-    /// The question-marked cells (<c>Field.Index</c> values).
-    /// Question marks are only a reminder for the player, so they live here, not in the game logic.
-    /// </summary>
-    private readonly HashSet<int> _questioned = new();
-
-    /// <summary>
-    /// The question-marked cells (<c>Field.Index</c>), e.g. to save them; <see cref="SetQuestionMarks"/> restores them.
-    /// </summary>
-    public IReadOnlyCollection<int> QuestionMarks => _questioned;
-
-    /// <summary>
-    /// Replaces the question marks, e.g. when a saved game is restored.
-    /// </summary>
-    /// <param name="cells">The cells to question-mark (<c>Field.Index</c> values).</param>
-    public void SetQuestionMarks(IEnumerable<int> cells)
-    {
-        _questioned.Clear();
-        _questioned.UnionWith(cells);
-        InvalidateVisual();
-    }
-
     // ---- Size and coordinates ----
 
     /// <summary>
-    /// The size of the whole board in board units (no gap after the last row and column), or empty without a board.
+    /// Whether the board shown is infinite.
     /// </summary>
-    private Size BoardSize => Board is null
-        ? default
-        : new Size(Board.Columns * CellPitch - (CellPitch - TileSize), Board.Rows * CellPitch - (CellPitch - TileSize));
+    private bool IsInfinite => Board is not null && Board.Size is null;
+
+    /// <summary>
+    /// The size of the whole board in board units (no gap after the last row and column), or empty without a
+    /// board or for an infinite board.
+    /// </summary>
+    private Size BoardSize => Board?.Size is BoardSize size
+        ? new Size(size.Columns * CellPitch - (CellPitch - TileSize), size.Rows * CellPitch - (CellPitch - TileSize))
+        : default;
+
+    /// <summary>
+    /// The size the view needs to show the whole of a finite board at <see cref="DefaultZoom"/>, in
+    /// device-independent units; <c>null</c> for an infinite board or without a board. The window uses it to fit
+    /// itself to a new board.
+    /// </summary>
+    public Size? PreferredSize => Board?.Size is null ? null : BoardSize * DefaultZoom;
+
+    /// <summary>
+    /// The smallest zoom: a finite board can be zoomed out until it fits (but not below the default if it already
+    /// fits); an infinite board down to <see cref="InfiniteMinZoomFactor"/> times the default.
+    /// </summary>
+    /// <param name="bounds">The size of the visible area, in screen pixels.</param>
+    private double MinZoom(Size bounds) => IsInfinite
+        ? DefaultZoom * InfiniteMinZoomFactor
+        : Math.Min(FitZoom(bounds), DefaultZoom);
+
+    /// <summary>
+    /// The largest zoom: <see cref="MaxZoomFactor"/> times the default.
+    /// </summary>
+    private static double MaxZoom => DefaultZoom * MaxZoomFactor;
 
     /// <summary>
     /// The zoom at which the whole board just fits; zooming out stops here.
@@ -193,7 +234,7 @@ public class BoardView : Control, ILogicalScrollable
     /// Where the board's top-left corner is drawn, in screen pixels: centred along a direction in which it is
     /// smaller than the view.
     /// </summary>
-    private Vector BoardOrigin => new Vector(
+    private Vector BoardOrigin => IsInfinite ? default : new Vector(
         Math.Max(0, (Bounds.Width - BoardSize.Width * _zoom) / 2),
         Math.Max(0, (Bounds.Height - BoardSize.Height * _zoom) / 2));
 
@@ -211,8 +252,8 @@ public class BoardView : Control, ILogicalScrollable
     }
 
     /// <summary>
-    /// Records the viewport size, keeps the zoom at least at the fit zoom (and at it while fitted) and
-    /// keeps the offset in range.
+    /// Records the viewport size, keeps the zoom between the limits, centres a new infinite board once its size
+    /// is known, and keeps the offset in range.
     /// </summary>
     /// <param name="finalSize">The size given to the view.</param>
     /// <returns>The size used.</returns>
@@ -220,37 +261,108 @@ public class BoardView : Control, ILogicalScrollable
     {
         Size size = base.ArrangeOverride(finalSize);
         _viewport = size;   // Bounds only changes after arranging, but the ScrollViewer asks during it
-        double fit = FitZoom(size);
-        if (_fitted || _zoom < fit)
+        _zoom = Math.Clamp(_zoom, MinZoom(size), Math.Max(MaxZoom, MinZoom(size)));
+        if (_center_target is not null && size.Width > 0)
         {
-            _zoom = fit;   // start fitted, stay fitted on resize, and never be smaller than the view
+            ApplyCenterTarget();
         }
         ClampOffset(size);
         return size;
     }
 
     /// <summary>
-    /// Keeps the board from being dragged out of view.
+    /// Puts the waiting centre target (<see cref="ShowCell"/>, or cell (0, 0) of a new infinite board) in the
+    /// middle of the view.
+    /// </summary>
+    private void ApplyCenterTarget()
+    {
+        if (_center_target is not Vector target)
+        {
+            return;
+        }
+        _center_target = null;
+        _offset = target - new Vector(_viewport.Width, _viewport.Height) / _zoom / 2;
+    }
+
+    /// <summary>
+    /// The cell in the middle of the view, in cells (fractions allowed): X is the row, Y the column. With
+    /// <see cref="ZoomFactor"/>, enough to show the same part of the board again with <see cref="ShowCell"/>.
+    /// </summary>
+    public Vector CenterCell => _center_target is Vector target
+        ? new Vector(target.Y, target.X) / CellPitch
+        : new Vector(_offset.Y + _viewport.Height / _zoom / 2, _offset.X + _viewport.Width / _zoom / 2) / CellPitch;
+
+    /// <summary>
+    /// The zoom as a multiple of the default (cells of <see cref="DefaultCellMillimetres"/> mm).
+    /// </summary>
+    public double ZoomFactor => _zoom / DefaultZoom;
+
+    /// <summary>
+    /// Shows a part of the board: puts a cell in the middle at a zoom (kept within the zoom limits). Used to
+    /// restore the view of a saved game; call it after setting <see cref="Board"/>.
+    /// </summary>
+    /// <param name="row">The row to put in the middle (fractions allowed).</param>
+    /// <param name="column">The column to put in the middle (fractions allowed).</param>
+    /// <param name="zoom_factor">The zoom as a multiple of the default.</param>
+    public void ShowCell(double row, double column, double zoom_factor)
+    {
+        _zoom = DefaultZoom * zoom_factor;
+        _center_target = new Vector(column, row) * CellPitch;
+        if (_viewport.Width > 0)
+        {
+            _zoom = Math.Clamp(_zoom, MinZoom(_viewport), Math.Max(MaxZoom, MinZoom(_viewport)));
+            ApplyCenterTarget();
+            ClampOffset(_viewport);
+            InvalidateVisual();
+        }
+    }
+
+    /// <summary>
+    /// Keeps a finite board from being dragged out of view (an infinite board has no limits), and tells the board
+    /// which cells are visible now.
     /// </summary>
     /// <param name="bounds">The size of the visible area, in screen pixels.</param>
     /// <param name="notify_scroll_viewer">Whether to raise <see cref="ScrollInvalidated"/> afterwards.</param>
     private void ClampOffset(Size bounds, bool notify_scroll_viewer = true)
     {
-        double visible_width = bounds.Width / _zoom;
-        double visible_height = bounds.Height / _zoom;
-        _offset = new Vector(
-            Math.Clamp(_offset.X, 0, Math.Max(0, BoardSize.Width - visible_width)),
-            Math.Clamp(_offset.Y, 0, Math.Max(0, BoardSize.Height - visible_height)));
+        if (!IsInfinite)
+        {
+            double visible_width = bounds.Width / _zoom;
+            double visible_height = bounds.Height / _zoom;
+            _offset = new Vector(
+                Math.Clamp(_offset.X, 0, Math.Max(0, BoardSize.Width - visible_width)),
+                Math.Clamp(_offset.Y, 0, Math.Max(0, BoardSize.Height - visible_height)));
+        }
         if (notify_scroll_viewer)
         {
             RaiseScrollInvalidated(EventArgs.Empty);   // let a ScrollViewer update its scrollbars
         }
+        UpdateVisibleArea(bounds);
+    }
+
+    /// <summary>
+    /// Tells the board which cells are visible (<see cref="IBoard.SetVisibleArea"/>), so an infinite board
+    /// can continue a cascade that reached the cells now in view.
+    /// </summary>
+    /// <param name="bounds">The size of the visible area, in screen pixels.</param>
+    private void UpdateVisibleArea(Size bounds)
+    {
+        if (Board is null || bounds.Width <= 0 || bounds.Height <= 0)
+        {
+            return;
+        }
+        Vector origin = BoardOrigin;
+        Board.SetVisibleArea(
+            (long)Math.Floor(_offset.Y / CellPitch),
+            (long)Math.Floor(_offset.X / CellPitch),
+            (long)Math.Floor((_offset.Y + (bounds.Height - origin.Y) / _zoom) / CellPitch),
+            (long)Math.Floor((_offset.X + (bounds.Width - origin.X) / _zoom) / CellPitch));
     }
 
     // ---- Scrolling (ILogicalScrollable): a ScrollViewer around the view shows scrollbars and sets Offset ----
 
     /// <summary>
-    /// The size of the board at the current zoom.
+    /// The size of the board at the current zoom; for an infinite board just the viewport, so no scrollbars show.
     /// </summary>
     /// <remarks>
     /// In screen pixels, as a ScrollViewer expects; _offset is in board units.
@@ -260,6 +372,10 @@ public class BoardView : Control, ILogicalScrollable
     {
         get
         {
+            if (IsInfinite)
+            {
+                return _viewport;
+            }
             Size board = BoardSize * _zoom;
             return new Size(board.Width < _viewport.Width + 0.5 ? Math.Min(board.Width, _viewport.Width) : board.Width,
                             board.Height < _viewport.Height + 0.5 ? Math.Min(board.Height, _viewport.Height) : board.Height);
@@ -276,13 +392,17 @@ public class BoardView : Control, ILogicalScrollable
 
     /// <summary>
     /// The scroll position in screen pixels (the board offset times the zoom). Setting it keeps it in range
-    /// and redraws.
+    /// and redraws. An infinite board has no scroll position: it is always 0 and setting it does nothing.
     /// </summary>
     public Vector Offset
     {
-        get => _offset * _zoom;
+        get => IsInfinite ? default : _offset * _zoom;
         set
         {
+            if (IsInfinite)
+            {
+                return;
+            }
             _offset = value / _zoom;
             ClampOffset(Bounds.Size, notify_scroll_viewer: false);   // the ScrollViewer set it, so it already knows
             InvalidateVisual();
@@ -334,24 +454,24 @@ public class BoardView : Control, ILogicalScrollable
     private Point ToBoard(Point screen) => (Point)(((Vector)screen - BoardOrigin) / _zoom + _offset);
 
     /// <summary>
-    /// The cell under a screen point, or null outside the board or in the gap between cells.
+    /// The cell under a screen point (X is the row, Y the column), or null outside a finite board.
     /// </summary>
     /// <param name="screen">The point relative to the control.</param>
-    /// <returns>The cell, or null.</returns>
-    private Field? CellAt(Point screen)
+    /// <returns>The cell's global position, or null.</returns>
+    private Point<long>? CellAt(Point screen)
     {
         if (Board is null || !new Rect(Bounds.Size).Contains(screen))
         {
             return null;
         }
         Point p = ToBoard(screen);
-        int column = (int)Math.Floor(p.X / CellPitch);
-        int row = (int)Math.Floor(p.Y / CellPitch);
-        if (row < 0 || row >= Board.Rows || column < 0 || column >= Board.Columns)
+        long column = (long)Math.Floor(p.X / CellPitch);
+        long row = (long)Math.Floor(p.Y / CellPitch);
+        if (Board.Size is BoardSize size && (row < 0 || row >= size.Rows || column < 0 || column >= size.Columns))
         {
             return null;
         }
-        return Board[row, column];
+        return new Point<long>(row, column);
     }
 
     // ---- Drawing ----
@@ -374,24 +494,35 @@ public class BoardView : Control, ILogicalScrollable
         Rect area = new Rect(Bounds.Size);
         Vector origin = BoardOrigin;
 
-        // Visible cell range.
-        int first_column = Math.Max(0, (int)Math.Floor(_offset.X / CellPitch));
-        int first_row = Math.Max(0, (int)Math.Floor(_offset.Y / CellPitch));
-        int last_column = Math.Min(Board.Columns - 1, (int)Math.Floor((_offset.X + (area.Width - origin.X) / _zoom) / CellPitch));
-        int last_row = Math.Min(Board.Rows - 1, (int)Math.Floor((_offset.Y + (area.Height - origin.Y) / _zoom) / CellPitch));
+        // Visible cell range; a finite board also stops at its edges.
+        long first_column = (long)Math.Floor(_offset.X / CellPitch);
+        long first_row = (long)Math.Floor(_offset.Y / CellPitch);
+        long last_column = (long)Math.Floor((_offset.X + (area.Width - origin.X) / _zoom) / CellPitch);
+        long last_row = (long)Math.Floor((_offset.Y + (area.Height - origin.Y) / _zoom) / CellPitch);
+        if (Board.Size is BoardSize size)
+        {
+            first_column = Math.Max(0, first_column);
+            first_row = Math.Max(0, first_row);
+            last_column = Math.Min(size.Columns - 1, last_column);
+            last_row = Math.Min(size.Rows - 1, last_row);
+        }
 
+        // Positions relative to the first visible cell keep the numbers small, however far an infinite board
+        // has been panned.
+        Vector first = new Vector(first_column * CellPitch, first_row * CellPitch);
         using (context.PushClip(area))
-        using (context.PushTransform(Matrix.CreateTranslation(-_offset) * Matrix.CreateScale(_zoom, _zoom)
+        using (context.PushTransform(Matrix.CreateTranslation(first - _offset) * Matrix.CreateScale(_zoom, _zoom)
                                      * Matrix.CreateTranslation(origin)))
         {
-            for (int row = first_row; row <= last_row; row++)
+            for (long row = first_row; row <= last_row; row++)
             {
-                for (int column = first_column; column <= last_column; column++)
+                for (long column = first_column; column <= last_column; column++)
                 {
-                    Field field = Board[row, column];
-                    using (context.PushTransform(Matrix.CreateTranslation(column * CellPitch, row * CellPitch)))
+                    var cell = new Point<long>(row, column);
+                    using (context.PushTransform(Matrix.CreateTranslation((column - first_column) * CellPitch,
+                                                                          (row - first_row) * CellPitch)))
                     {
-                        DrawTile(context, palette, field);
+                        DrawTile(context, palette, Board.FieldAt(row, column), cell);
                     }
                 }
             }
@@ -405,22 +536,28 @@ public class BoardView : Control, ILogicalScrollable
     /// </summary>
     /// <param name="context">The drawing context, already transformed to the cell's position.</param>
     /// <param name="palette">The colours for the current theme.</param>
-    /// <param name="field">The cell to draw.</param>
-    private void DrawTile(DrawingContext context, TilePalette palette, Field field)
+    /// <param name="field">The cell to draw, or <c>null</c> for a part of an infinite board that doesn't exist yet
+    /// (drawn as a hidden cell).</param>
+    /// <param name="cell">The cell's position, for the hover and press look.</param>
+    private void DrawTile(DrawingContext context, TilePalette palette, Field? field, Point<long> cell)
     {
-        bool revealed = !field.Hidden;
-        bool hover = ReferenceEquals(field, _hover_cell);
-        bool pressed = hover && ReferenceEquals(field, _pressed_cell);
+        bool revealed = field is not null && !field.Hidden;
+        bool hover = Nullable.Equals(_hover_cell, cell);
+        bool pressed = hover && Nullable.Equals(_pressed_cell, cell);
 
         using var shrink = TileShapes.PushPressed(context, pressed);
-        IBrush background = hover ? palette.Hover : !revealed ? palette.Hidden : field.IsBomb ? palette.Bomb : palette.Clear;
+        IBrush background = hover ? palette.Hover : !revealed ? palette.Hidden : field!.IsBomb ? palette.Bomb : palette.Clear;
         TileShapes.DrawBase(context, palette, background, raised: !revealed, hover);
+        if (field is null)
+        {
+            return;
+        }
 
         if (field.Flagged)
         {
             TileShapes.DrawIcon(context, () => TileShapes.DrawFlag(context, palette));
         }
-        else if (!revealed && _questioned.Contains(field.Index))
+        else if (field.Questioned)
         {
             TileShapes.DrawIcon(context, () => TileShapes.DrawQuestion(context, palette));
         }
@@ -470,11 +607,11 @@ public class BoardView : Control, ILogicalScrollable
     /// <summary>
     /// The cell under the pointer, drawn with the hover look; null while panning or locked.
     /// </summary>
-    private Field? _hover_cell;
+    private Point<long>? _hover_cell;
     /// <summary>
     /// The cell a left or right button was pressed on; a release on the same cell acts on it.
     /// </summary>
-    private Field? _pressed_cell;
+    private Point<long>? _pressed_cell;
     /// <summary>
     /// The button currently held down, or <see cref="MouseButton.None"/>. Only one button is handled at a time.
     /// </summary>
@@ -552,8 +689,8 @@ public class BoardView : Control, ILogicalScrollable
         }
         _last_position = position;
 
-        Field? hover = _panning || IsLocked ? null : CellAt(position);
-        if (!ReferenceEquals(hover, _hover_cell))
+        Point<long>? hover = _panning || IsLocked ? null : CellAt(position);
+        if (!Nullable.Equals(hover, _hover_cell))
         {
             _hover_cell = hover;
             InvalidateVisual();
@@ -572,16 +709,16 @@ public class BoardView : Control, ILogicalScrollable
         {
             return;
         }
-        Field? cell = CellAt(e.GetPosition(this));
-        if (!_panning && !IsLocked && cell is not null && ReferenceEquals(cell, _pressed_cell))
+        Point<long>? cell = CellAt(e.GetPosition(this));
+        if (!_panning && !IsLocked && cell is Point<long> c && Nullable.Equals(cell, _pressed_cell))
         {
             if (_pressed_button == MouseButton.Left)
             {
-                Reveal(cell);
+                Board?.Reveal(c.X, c.Y);
             }
             else if (_pressed_button == MouseButton.Right)
             {
-                CycleMark(cell);
+                Board?.CycleMark(c.X, c.Y);
             }
         }
         EndPress();
@@ -614,7 +751,7 @@ public class BoardView : Control, ILogicalScrollable
     }
 
     /// <summary>
-    /// Zooms around the pointer, between the fit zoom and <see cref="MaxZoom"/> (or the fit zoom, if larger).
+    /// Zooms around the pointer, between <see cref="MinZoom"/> and <see cref="MaxZoom"/>.
     /// </summary>
     /// <param name="e">The event data.</param>
     protected override void OnPointerWheelChanged(PointerWheelEventArgs e)
@@ -625,8 +762,8 @@ public class BoardView : Control, ILogicalScrollable
             return;
         }
         Point position = e.GetPosition(this);
-        double fit = FitZoom(Bounds.Size);
-        double zoom = Math.Clamp(_zoom * Math.Pow(1.15, e.Delta.Y), fit, Math.Max(MaxZoom, fit));
+        double min = MinZoom(Bounds.Size);
+        double zoom = Math.Clamp(_zoom * Math.Pow(1.15, e.Delta.Y), min, Math.Max(MaxZoom, min));
         e.Handled = true;
         if (zoom == _zoom)
         {
@@ -635,7 +772,6 @@ public class BoardView : Control, ILogicalScrollable
         // Keep the board point under the pointer in place.
         Point anchor = ToBoard(position);
         _zoom = zoom;
-        _fitted = zoom <= fit;
         _offset = (Vector)anchor - ((Vector)position - BoardOrigin) / _zoom;
         ClampOffset(Bounds.Size);
         InvalidateVisual();
@@ -651,49 +787,6 @@ public class BoardView : Control, ILogicalScrollable
         _pressed_cell = null;
         _panning = false;
         Cursor = null;
-        InvalidateVisual();
-    }
-
-    // ---- Game actions ----
-
-    /// <summary>
-    /// Reveals a cell. The first click generates the board. On a revealed number with all its bombs flagged,
-    /// it chords: the other neighbours are revealed too.
-    /// </summary>
-    /// <param name="field">The clicked cell.</param>
-    private void Reveal(Field field)
-    {
-        field.Parent.Initialize(field.Position);   // the first click generates the board
-        if (!field.Hidden && field.Number <= field.Neighbors.Count((Field f) => f.Flagged))
-        {
-            // Chord: a revealed number with all its bombs flagged reveals the other neighbours.
-            foreach (Field neighbor in field.Neighbors)
-            {
-                if (!neighbor.Flagged)
-                {
-                    neighbor.Hidden = false;
-                }
-            }
-        }
-        field.Hidden = false;
-    }
-
-    /// <summary>
-    /// Cycles a cell's mark: nothing -&gt; flag -&gt; question mark -&gt; nothing.
-    /// </summary>
-    /// <param name="field">The right-clicked cell.</param>
-    private void CycleMark(Field field)
-    {
-        if (_questioned.Remove(field.Index))
-        {
-            InvalidateVisual();
-            return;
-        }
-        if (field.Flagged)
-        {
-            _questioned.Add(field.Index);
-        }
-        field.Flagged = !field.Flagged;
         InvalidateVisual();
     }
 }

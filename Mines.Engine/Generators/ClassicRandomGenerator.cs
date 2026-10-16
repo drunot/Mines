@@ -25,16 +25,16 @@ public class ClassicRandomGenerator : IMatrixGenerator
 
     /// <inheritdoc/>
     /// <exception cref="ArgumentException">There are not enough cells for <paramref name="bomb_count"/> bombs.</exception>
-    public bool[,] Generate(int rows, int columns, Point<int> first_reveal, int bomb_count)
+    public void Generate(FieldMatrix fieldMatrix, Point<int> first_reveal, int bomb_count)
     {
-        var bombs = new bool[rows, columns];
+        var bombs = new bool[fieldMatrix.Rows, fieldMatrix.Columns];
 
-        int[] cells = Enumerable.Range(0, rows * columns).ToArray();
+        int[] cells = Enumerable.Range(0, fieldMatrix.Rows * fieldMatrix.Columns).ToArray();
         _rand.Shuffle(cells);
         int placed = 0;
         for (int j = 0; j < cells.Length && placed < bomb_count; ++j)
         {
-            var point = new Point<int>(cells[j] / columns, cells[j] % columns);
+            var point = new Point<int>(cells[j] / fieldMatrix.Columns, cells[j] % fieldMatrix.Columns);
             if (point.Equals(first_reveal))
             {
                 continue;   // keep the start point free. (Original Window 2000 Minesweeper moves the first bomb if it is where the user clicks.)
@@ -47,6 +47,6 @@ public class ClassicRandomGenerator : IMatrixGenerator
             throw new ArgumentException("Not enough cells outside the start area for that many bombs.");
         }
 
-        return bombs;
+        fieldMatrix.ApplyBombs(bombs);
     }
 }

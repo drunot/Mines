@@ -112,18 +112,18 @@ public class FastDeterministicGenerator : IMatrixGenerator
 
     /// <inheritdoc/>
     /// <exception cref="ArgumentException">There are not enough cells outside the start area for <paramref name="bomb_count"/> bombs.</exception>
-    public bool[,] Generate(int rows, int columns, Point<int> first_reveal, int bomb_count)
+    public void Generate(FieldMatrix filedMatrix, Point<int> first_reveal, int bomb_count)
     {
         while (true)
         {
-            var bombs = new bool[rows, columns];
+            var bombs = new bool[filedMatrix.Rows, filedMatrix.Columns];
 
-            int[] cells = Enumerable.Range(0, rows * columns).ToArray();
+            int[] cells = Enumerable.Range(0, filedMatrix.Rows * filedMatrix.Columns).ToArray();
             _rand.Shuffle(cells);
             int placed = 0;
             for (int j = 0; j < cells.Length && placed < bomb_count; ++j)
             {
-                var point = new Point<int>(cells[j] / columns, cells[j] % columns);
+                var point = new Point<int>(cells[j] / filedMatrix.Columns, cells[j] % filedMatrix.Columns);
                 if (WithinStart(first_reveal, point))
                 {
                     continue;   // keep the start area free; try the next cell
@@ -144,7 +144,8 @@ public class FastDeterministicGenerator : IMatrixGenerator
             {
                 GetBombs(matrix, bombs);
 
-                return bombs;
+                filedMatrix.ApplyBombs(bombs);
+                return;
             }
             for (int i = 0; i < fix_attempts; i++)
             {
@@ -153,7 +154,8 @@ public class FastDeterministicGenerator : IMatrixGenerator
                 {
                     if (TryVerify(ref matrix, bombs, first_reveal))
                     {
-                        return bombs;
+                        filedMatrix.ApplyBombs(bombs);
+                        return;
                     }
                 }
 
@@ -176,7 +178,8 @@ public class FastDeterministicGenerator : IMatrixGenerator
                 // The fast solver can create boards in rare cases that aren't.
                 if (TryVerify(ref matrix, bombs, first_reveal))
                 {
-                    return bombs;
+                    filedMatrix.ApplyBombs(bombs);
+                    return;
                 }
             }
         }

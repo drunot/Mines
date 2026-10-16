@@ -6,31 +6,57 @@
              xmlns:local="using:Mines"
              x:Class="Mines.SettingsPanel">
 
-  <!-- The settings popup: window colour inside a raised bevel frame, like the rest of the app. -->
+  <!-- The settings popup: window colour inside a raised bevel frame, like the rest of the app. One tab per kind
+       of game; the tab that is open when "New game" is pressed decides which kind starts. -->
   <Border Background="{DynamicResource HiddenBrush}" CornerRadius="1">
     <local:BevelFrame IsRaised="True">
-      <StackPanel Margin="12" Spacing="10" MinWidth="260">
+      <StackPanel Margin="12" Spacing="10" MinWidth="300">
         <TextBlock Text="Settings" FontWeight="Bold" FontSize="16"/>
 
-        <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="6">
-          <TextBlock Grid.Row="0" Text="Rows" VerticalAlignment="Center"/>
-          <NumericUpDown Grid.Row="0" Grid.Column="1" x:Name="RowsInput"
-                         Minimum="3" Maximum="200" Increment="1" FormatString="0"/>
-          <TextBlock Grid.Row="1" Text="Columns" VerticalAlignment="Center"/>
-          <NumericUpDown Grid.Row="1" Grid.Column="1" x:Name="ColumnsInput"
-                         Minimum="3" Maximum="200" Increment="1" FormatString="0"/>
-          <TextBlock Grid.Row="2" Text="Bombs" VerticalAlignment="Center"/>
-          <NumericUpDown Grid.Row="2" Grid.Column="1" x:Name="BombsInput"
-                         Minimum="1" Increment="1" FormatString="0"/>
-        </Grid>
+        <TabControl x:Name="ModeTabs" Padding="0,8,0,0">
+          <TabItem Header="Board" FontSize="14">
+            <StackPanel Spacing="10">
+              <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="6">
+                <TextBlock Grid.Row="0" Text="Rows" VerticalAlignment="Center"/>
+                <NumericUpDown Grid.Row="0" Grid.Column="1" x:Name="RowsInput"
+                               Minimum="3" Maximum="200" Increment="1" FormatString="0"/>
+                <TextBlock Grid.Row="1" Text="Columns" VerticalAlignment="Center"/>
+                <NumericUpDown Grid.Row="1" Grid.Column="1" x:Name="ColumnsInput"
+                               Minimum="3" Maximum="200" Increment="1" FormatString="0"/>
+                <TextBlock Grid.Row="2" Text="Bombs" VerticalAlignment="Center"/>
+                <NumericUpDown Grid.Row="2" Grid.Column="1" x:Name="BombsInput"
+                               Minimum="1" Increment="1" FormatString="0"/>
+              </Grid>
 
-        <StackPanel Spacing="2">
-          <TextBlock Text="Board generator" FontWeight="Bold"/>
-          <RadioButton x:Name="NoGuessingOption" GroupName="Generator"
-                       Content="No guessing: always solvable by logic"/>
-          <RadioButton x:Name="ClassicOption" GroupName="Generator"
-                       Content="Classic: random, may need a guess"/>
-        </StackPanel>
+              <StackPanel Spacing="2">
+                <TextBlock Text="Board generator" FontWeight="Bold"/>
+                <RadioButton x:Name="NoGuessingOption" GroupName="Generator"
+                             Content="No guessing: always solvable by logic"/>
+                <RadioButton x:Name="ClassicOption" GroupName="Generator"
+                             Content="Classic: random, may need a guess"/>
+              </StackPanel>
+            </StackPanel>
+          </TabItem>
+
+          <TabItem Header="Endless" FontSize="14">
+            <StackPanel Spacing="10">
+              <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+                <TextBlock Text="Bomb density (%)" VerticalAlignment="Center"/>
+                <NumericUpDown Grid.Column="1" x:Name="DensityInput"
+                               Minimum="1" Maximum="50" Increment="1" FormatString="0"/>
+              </Grid>
+              <StackPanel Spacing="2">
+                <TextBlock Text="Board generator" FontWeight="Bold"/>
+                <RadioButton x:Name="EndlessNoGuessingOption" GroupName="EndlessGenerator"
+                             Content="Attempts no guessing"/>
+                <RadioButton x:Name="EndlessClassicOption" GroupName="EndlessGenerator"
+                             Content="Classic: random, may need a guess"/>
+              </StackPanel>
+              <TextBlock TextWrapping="Wrap" MaxWidth="300" Opacity="0.8"
+                         Text="A board without edges. Hitting a bomb doesn't end the game; it resets the count of safe clicks in a row. With &quot;attempts no guessing&quot;, the first click opens an area and the board tries to make every area solvable by logic, but now and then a spot may still need a guess."/>
+            </StackPanel>
+          </TabItem>
+        </TabControl>
 
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
           <Button Classes="tile" x:Name="CancelButton" Content="Cancel"/>

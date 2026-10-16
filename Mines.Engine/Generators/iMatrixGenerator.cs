@@ -7,12 +7,10 @@ namespace Mines.Generators;
 public interface IMatrixGenerator
 {
     /// <summary>
-    /// Creates a bomb layout.
+    /// Places the bombs on <paramref name="matrix"/> (through <see cref="FieldMatrix.ApplyBombs"/>).
     /// </summary>
-    /// <param name="rows">The number of rows.</param>
-    /// <param name="columns">The number of columns.</param>
+    /// <param name="matrix">The board to place the bombs on; its size decides the layout's size.</param>
     /// <param name="first_reveal">The first field the player reveals (X is the row, Y the column).</param>
     /// <param name="bomb_count">The number of bombs to place.</param>
-    /// <returns>The layout: <c>[row, column]</c> is true for a bomb.</returns>
-    bool[,] Generate(int rows, int columns, Point<int> first_reveal, int bomb_count);
+    void Generate(FieldMatrix matrix, Point<int> first_reveal, int bomb_count);
 }

@@ -38,7 +38,7 @@ public class EquationList
     /// </summary>
     public void TryCreateGlobalEquation()
     {
-        if (_global is not null || _matrix.FieldsLeft > FieldsBeforeLast)
+        if (!UseGlobalEquation || _global is not null || _matrix.FieldsLeft > FieldsBeforeLast)
         {
             return;
         }
@@ -64,6 +64,38 @@ public class EquationList
 
     /// <summary>Backing field for <see cref="Global"/>.</summary>
     Equation? _global = null;
+
+    /// <summary>
+    /// Whether the global equation (the number of bombs left) may be used. Off for a part of a larger board,
+    /// where the player doesn't know how many bombs the part holds.
+    /// </summary>
+    public bool UseGlobalEquation { get; init; } = true;
+
+    /// <summary>
+    /// Whether revealed cells on the edge of the board give no equation. On for a part of a larger board: such a
+    /// cell has neighbours outside the part, so the number counted here isn't the number the player sees.
+    /// </summary>
+    public bool IgnoreEdges { get; init; }
+
+    /// <summary>
+    /// Whether a revealed field tells the player something: it shows a number that is complete. Revealed bombs
+    /// show no number, and with <see cref="IgnoreEdges"/> neither do cells on the board's edge.
+    /// </summary>
+    /// <param name="field">A revealed field of the board.</param>
+    /// <returns><c>true</c> if the field gives an equation (or opens its neighbours, for a 0).</returns>
+    public bool GivesEquation(Field field)
+    {
+        if (field.IsBomb)
+        {
+            return false;
+        }
+        if (!IgnoreEdges)
+        {
+            return true;
+        }
+        Point<int> p = _matrix.LocalPosition(field);
+        return p.X > 0 && p.Y > 0 && p.X < _matrix.Rows - 1 && p.Y < _matrix.Columns - 1;
+    }
 
     /// <summary>
     /// Creates an empty equation list for <paramref name="matrix"/>.

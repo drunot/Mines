@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Mines;
+using Mines.Generators;
 using Mines.Solving;
 
 namespace Mines.Tests;
@@ -55,6 +56,20 @@ internal static class Boards
         nameof(ConstraintSolver) => new ConstraintSolver(),
         _ => throw new ArgumentException($"Unknown solver {name}", nameof(name)),
     };
+
+    // Lets the generator place the bombs, the way the game does on the first click, and returns the layout:
+    // bombs[row, column] is true for a bomb.
+    public static bool[,] Generate(IMatrixGenerator generator, int rows, int columns, Point<int> first, int bomb_count)
+    {
+        var matrix = new FieldMatrix(rows, columns, bomb_count, generator);
+        matrix.Initialize(first);
+        var bombs = new bool[rows, columns];
+        foreach (Field f in matrix.Fields)
+        {
+            bombs[matrix.LocalPosition(f).X, matrix.LocalPosition(f).Y] = f.IsBomb;
+        }
+        return bombs;
+    }
 
     public static IEnumerable<Field> All(FieldMatrix matrix) => matrix.Fields.Cast<Field>();
 

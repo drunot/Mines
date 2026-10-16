@@ -63,7 +63,15 @@ public static class GeneratorCheck
     public static bool[,] Generate(string generator_name, int rows, int columns, int bombs, int seed)
     {
         IMatrixGenerator generator = Generators.Single(g => g.Name == generator_name).Create(new Random(seed));
-        return generator.Generate(rows, columns, FirstClick(rows, columns), bombs);
+        // The generator fills the board on the first click, as in the game; read the layout back from it.
+        var matrix = new FieldMatrix(rows, columns, bombs, generator);
+        matrix.Initialize(FirstClick(rows, columns));
+        var layout = new bool[rows, columns];
+        foreach (Field f in matrix.Fields)
+        {
+            layout[matrix.LocalPosition(f).X, matrix.LocalPosition(f).Y] = f.IsBomb;
+        }
+        return layout;
     }
 
     // Generates boards one by one with each generator, times each, and checks that every board is valid.

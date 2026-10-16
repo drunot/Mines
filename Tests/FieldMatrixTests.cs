@@ -110,9 +110,42 @@ public class FieldMatrixTests
         for (int seed = 0; seed < 20; ++seed)
         {
             var generator = new Mines.Generators.ClassicRandomGenerator(new System.Random(seed));
-            bool[,] bombs = generator.Generate(3, 3, new Point<int>(1, 2), 8);
+            bool[,] bombs = Boards.Generate(generator, 3, 3, new Point<int>(1, 2), 8);
             Assert.False(bombs[1, 2], $"seed {seed} put a bomb under the first click");
         }
+    }
+
+    [Fact]
+    public void Marks_cycle_and_only_flags_count()
+    {
+        FieldMatrix matrix = SmallBoard();
+
+        matrix.CycleMark(0, 0);   // flag
+        Assert.Equal(Mark.Flag, matrix[0, 0].Mark);
+        AssertCountersMatch(matrix, "after flagging");
+        Assert.Equal(1, matrix.BombsLeft);
+
+        matrix.CycleMark(0, 0);   // question mark: the flag no longer counts
+        Assert.True(matrix[0, 0].Questioned);
+        Assert.False(matrix[0, 0].Flagged);
+        AssertCountersMatch(matrix, "after the question mark");
+        Assert.Equal(2, matrix.BombsLeft);
+
+        matrix.CycleMark(0, 0);   // none
+        Assert.Equal(Mark.None, matrix[0, 0].Mark);
+        AssertCountersMatch(matrix, "after removing the mark");
+    }
+
+    [Fact]
+    public void Revealing_a_question_marked_cell_removes_the_mark()
+    {
+        FieldMatrix matrix = SmallBoard();
+        matrix[1, 1].Questioned = true;
+
+        matrix[1, 1].Hidden = false;
+
+        Assert.False(matrix[1, 1].Hidden);
+        Assert.Equal(Mark.None, matrix[1, 1].Mark);
     }
 
     // A full solve reveals and flags many cells; the copy constructor's counters are checked too.
@@ -128,7 +161,7 @@ public class FieldMatrixTests
                 continue;
             }
             var matrix = new FieldMatrix(layout);
-            matrix[start.Position.X, start.Position.Y].Hidden = false;
+            matrix.FieldAt(start.Index).Hidden = false;
 
             new ConstraintSolver().Solve(matrix);
 

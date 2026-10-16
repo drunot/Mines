@@ -7,14 +7,19 @@
              x:Class="Mines.Minefield">
 
     <DockPanel>
-      <!-- Bombs left on the left, the reset button in the middle, settings and the time on the right. -->
-      <local:BevelFrame DockPanel.Dock="Top" Margin="5,5,5,5">
-        <Grid Margin="5" ColumnDefinitions="*,Auto,*">
-          <local:SegmentCounter x:Name="BombsLeftCounter" Grid.Column="0"
-                                HorizontalAlignment="Left" VerticalAlignment="Center"/>
+      <!-- Bombs left (or, on an endless board, the safe clicks in a row and the best streak) on the left, the
+           reset button in the middle, settings and the time on the right. -->
+      <local:BevelFrame x:Name="Toolbar" DockPanel.Dock="Top" Margin="5,5,5,5">
+        <Grid x:Name="ToolbarGrid" Margin="5" ColumnDefinitions="*,Auto,*">
+          <!-- The best streak only shows on an endless board. -->
+          <StackPanel x:Name="LeftCounters" Grid.Column="0" Orientation="Horizontal" Spacing="5"
+                      HorizontalAlignment="Left" VerticalAlignment="Center">
+            <local:SegmentCounter x:Name="BombsLeftCounter" VerticalAlignment="Center"/>
+            <local:SegmentCounter x:Name="BestCounter" VerticalAlignment="Center" IsVisible="False"/>
+          </StackPanel>
           <!-- Reset button: a tile with a face showing the game state (normal, excited, won, dead). -->
           <local:FaceButton x:Name="ResetButton" Grid.Column="1" VerticalAlignment="Center"/>
-          <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="5"
+          <StackPanel x:Name="RightTools" Grid.Column="2" Orientation="Horizontal" Spacing="5"
                       HorizontalAlignment="Right" VerticalAlignment="Center">
             <!-- Settings: opens the settings popup below it. -->
             <local:SettingsButton x:Name="SettingsButton" VerticalAlignment="Center"/>
@@ -28,10 +33,10 @@
       </local:BevelFrame>
       <!-- Sunken bevel frame (dark top and left, light bottom and right), mitred corner to corner. -->
       <local:BevelFrame Margin="5,0,5,5">
-        <!-- The board fills the scroll box and starts zoomed to fit it; mouse wheel zooms in (never out past
-             the fit), dragging or the scrollbars pan. -->
+        <!-- The board fills the scroll box with cells of 5 mm; the mouse wheel zooms, dragging or the scrollbars
+             pan (an endless board has no scrollbars). -->
         <!-- SystemRegionBrush: the theme's normal window background (the window itself uses ClearBrush). -->
-        <ScrollViewer Background="{DynamicResource HiddenBrush}"
+        <ScrollViewer x:Name="BoardScroller" Background="{DynamicResource HiddenBrush}"
                       HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
           <local:BoardView x:Name="BoardView"/>
         </ScrollViewer>

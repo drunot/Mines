@@ -23,6 +23,6 @@ public interface IResumableSolver: ISolver
     /// The pairs of fields to swap (X is the row, Y the column), e.g. from
     /// <see cref="BoardFixer.iBoardFixer.GetBoardChanges"/>. Both fields of a pair must be hidden and unflagged.
     /// </param>
-    void SwapAndContinue(List<(Point<int>,Point<int>)> swaps);
+    void SwapAndContinue(List<(Point<long>, Point<long>)> swaps);
 
 }

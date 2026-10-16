@@ -80,15 +80,15 @@ public class SolverTests
                 continue;
             }
             FieldMatrix tested = new FieldMatrix(reference);
-            reference[start.Position.X, start.Position.Y].Hidden = false;
-            tested[start.Position.X, start.Position.Y].Hidden = false;
+            reference.FieldAt(start.Index).Hidden = false;
+            tested.FieldAt(start.Index).Hidden = false;
 
             new NeighborSolver().Solve(reference);
             Boards.Solver(solver_name).Solve(tested);
 
             foreach (Field expected in Boards.All(reference))
             {
-                Field actual = tested[expected.Position.X, expected.Position.Y];
+                Field actual = tested.FieldAt(expected.Index);
                 string where = $"{rows}x{columns}/{bombs} seed {seed}, cell ({expected.Position.X},{expected.Position.Y})";
                 Assert.False(false == expected.Hidden && actual.Hidden, $"Missed a reveal: {where}");
                 Assert.False(expected.Flagged && false == actual.Flagged, $"Missed a flag: {where}");

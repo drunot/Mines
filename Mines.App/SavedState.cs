@@ -26,6 +26,11 @@ public sealed class SavedState
     public SavedGame? Game { get; set; }
 
     /// <summary>
+    /// The endless game in progress, or null. An endless game never ends, so it is saved once started.
+    /// </summary>
+    public SavedEndlessGame? EndlessGame { get; set; }
+
+    /// <summary>
     /// The path of the state file. Settable so tests can use another file.
     /// </summary>
     public static string FilePath { get; set; } = Path.Combine(
@@ -101,6 +106,27 @@ public sealed class SavedSettings
     /// Which generator makes new boards.
     /// </summary>
     public GeneratorKind Generator { get; set; } = GeneratorKind.NoGuessing;
+    /// <summary>
+    /// Whether the last game was endless (an infinite board) rather than a board of <see cref="Rows"/> by
+    /// <see cref="Columns"/>.
+    /// </summary>
+    public bool Endless { get; set; }
+    /// <summary>
+    /// The bomb density of an endless board, in percent.
+    /// </summary>
+    public int DensityPercent { get; set; } = 15;
+    /// <summary>
+    /// Which generator makes endless boards.
+    /// </summary>
+    public GeneratorKind EndlessGenerator { get; set; } = GeneratorKind.NoGuessing;
+    /// <summary>
+    /// The width of the window's content when it was last open, or <c>null</c> if unknown.
+    /// </summary>
+    public double? WindowWidth { get; set; }
+    /// <summary>
+    /// The height of the window's content when it was last open, or <c>null</c> if unknown.
+    /// </summary>
+    public double? WindowHeight { get; set; }
 }
 
 /// <summary>
@@ -141,10 +167,9 @@ public sealed class SavedGame
     /// Captures a board in a <see cref="SavedGame"/>.
     /// </summary>
     /// <param name="board">The board to save.</param>
-    /// <param name="questioned">The question-marked cells (<c>Field.Index</c> values).</param>
     /// <param name="elapsed">The time played so far.</param>
     /// <returns>The saved game.</returns>
-    public static SavedGame From(FieldMatrix board, System.Collections.Generic.IEnumerable<int> questioned, TimeSpan elapsed)
+    public static SavedGame From(FieldMatrix board, TimeSpan elapsed)
     {
         var fields = board.Fields.Cast<Field>().ToList();
         return new SavedGame
@@ -154,7 +179,7 @@ public sealed class SavedGame
             Bombs = fields.Where(f => f.IsBomb).Select(f => f.Index).ToArray(),
             Revealed = fields.Where(f => !f.Hidden).Select(f => f.Index).ToArray(),
             Flagged = fields.Where(f => f.Flagged).Select(f => f.Index).ToArray(),
-            Questioned = questioned.ToArray(),
+            Questioned = fields.Where(f => f.Questioned).Select(f => f.Index).ToArray(),
             ElapsedSeconds = elapsed.TotalSeconds,
         };
     }
@@ -195,6 +220,59 @@ public sealed class SavedGame
         {
             board.FieldAt(i).Flagged = true;
         }
+        foreach (int i in Questioned)
+        {
+            board.FieldAt(i).Questioned = true;
+        }
         return board;
+    }
+}
+
+/// <summary>
+/// An endless game in progress: the board, how it is generated, the time played and where the view was.
+/// </summary>
+public sealed class SavedEndlessGame
+{
+    /// <summary>
+    /// The bomb density of the board, in percent.
+    /// </summary>
+    public int DensityPercent { get; set; } = 15;
+    /// <summary>
+    /// Which generator makes the board's new chunks.
+    /// </summary>
+    public GeneratorKind Generator { get; set; } = GeneratorKind.NoGuessing;
+    /// <summary>
+    /// The time played so far, in seconds.
+    /// </summary>
+    public double ElapsedSeconds { get; set; }
+    /// <summary>
+    /// The row in the middle of the view (fractions allowed).
+    /// </summary>
+    public double ViewRow { get; set; }
+    /// <summary>
+    /// The column in the middle of the view (fractions allowed).
+    /// </summary>
+    public double ViewColumn { get; set; }
+    /// <summary>
+    /// The zoom, as a multiple of the default cell size.
+    /// </summary>
+    public double ViewZoom { get; set; } = 1;
+    /// <summary>
+    /// The board itself: its chunks and counters.
+    /// </summary>
+    public InfiniteBoardState Board { get; set; } = new();
+
+    /// <summary>
+    /// Restores the board.
+    /// </summary>
+    /// <returns>The board, or <c>null</c> if the saved data is damaged.</returns>
+    public InfiniteFieldMatrix? ToBoard()
+    {
+        if (DensityPercent < 0 || DensityPercent > 100 || ElapsedSeconds < 0 || Board is null)
+        {
+            return null;
+        }
+        GeneratorType type = Generator == GeneratorKind.Classic ? GeneratorType.Random : GeneratorType.Deterministic;
+        return InfiniteFieldMatrix.Load(Board, DensityPercent / 100f, type);
     }
 }

@@ -29,6 +29,11 @@ public interface iBoardFixer
     /// </remarks>
     /// <param name="board">The partly solved board the solver got stuck on. Its flags must be correct.</param>
     /// <param name="swaps">The pairs of fields (X is the row, Y the column) to swap, or <c>null</c> on failure.</param>
+    /// <param name="locked">
+    /// Cells whose bomb must not move (<c>[row, column]</c> is true), e.g. what the player of an infinite board has
+    /// seen; <c>null</c> to allow every cell.
+    /// </param>
     /// <returns><c>true</c> if swaps were found.</returns>
-    bool GetBoardChanges(FieldMatrix board, [NotNullWhen(true)] out List<(Point<int>, Point<int>)>? swaps);
+    bool GetBoardChanges(FieldMatrix board, [NotNullWhen(true)] out List<(Point<long>, Point<long>)>? swaps, bool[,]? locked = null);
+
 }
