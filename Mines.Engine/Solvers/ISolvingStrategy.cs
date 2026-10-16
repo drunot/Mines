@@ -13,4 +13,3 @@ interface ISolvingStrategy
     /// <returns><c>true</c> if the strategy did some work; <c>false</c> if it had nothing left to do.</returns>
     bool ApplyStrategy(FieldMatrix fieldMatrix, EquationList equations);
 }
-

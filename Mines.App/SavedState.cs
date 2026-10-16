@@ -7,7 +7,8 @@ using System.Text.Json.Serialization;
 namespace Mines;
 
 /// <summary>
-/// What is remembered between runs: the last settings, and the board if a game was left unfinished.
+/// What is remembered between runs: the last settings (with the window size), and the game: a finite game if it
+/// was left unfinished, an endless game whenever one was started.
 /// </summary>
 /// <remarks>
 /// Stored as JSON in the user's settings folder (~/.config/Mines/state.json on Linux,
@@ -21,7 +22,8 @@ public sealed class SavedState
     public SavedSettings Settings { get; set; } = new();
 
     /// <summary>
-    /// The game in progress, or null. Only an unfinished game: started (bombs placed), and neither lost nor won.
+    /// The finite game in progress, or null. Only an unfinished game: started (bombs placed), and neither lost nor
+    /// won.
     /// </summary>
     public SavedGame? Game { get; set; }
 
@@ -41,12 +43,21 @@ public sealed class SavedState
     /// </summary>
     /// <returns>
     /// The saved state, or null if there is none or it can't be read (then the game starts with its defaults).
+    /// Settings that are missing or out of range are replaced by usable values (<see cref="SavedSettings.Sanitize"/>).
     /// </returns>
     public static SavedState? Load()
     {
         try
         {
-            return File.Exists(FilePath) ? JsonSerializer.Deserialize<SavedState>(File.ReadAllText(FilePath), s_json) : null;
+            if (!File.Exists(FilePath)
+                || JsonSerializer.Deserialize<SavedState>(File.ReadAllText(FilePath), JsonOptions)
+                    is not SavedState state)
+            {
+                return null;
+            }
+            state.Settings ??= new SavedSettings();   // a file with "Settings": null
+            state.Settings.Sanitize();
+            return state;
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or JsonException)
         {
@@ -67,7 +78,7 @@ public sealed class SavedState
             Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
             // Write a temporary file and then replace the old one, so a crash while saving can't leave half a file.
             string temporary = FilePath + ".tmp";
-            File.WriteAllText(temporary, JsonSerializer.Serialize(this, s_json));
+            File.WriteAllText(temporary, JsonSerializer.Serialize(this, JsonOptions));
             File.Move(temporary, FilePath, overwrite: true);
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
@@ -78,7 +89,7 @@ public sealed class SavedState
     /// <summary>
     /// JSON options for the state file: indented, with enums written as names.
     /// </summary>
-    private static readonly JsonSerializerOptions s_json = new()
+    private static readonly JsonSerializerOptions JsonOptions = new()
     {
         WriteIndented = true,
         Converters = { new JsonStringEnumConverter() },
@@ -86,10 +97,39 @@ public sealed class SavedState
 }
 
 /// <summary>
-/// The saved game settings: board size, bomb count and generator.
+/// The saved settings: board size, bomb count and generator, whether the game is endless, the endless board's
+/// density and generator, and the window size.
 /// </summary>
 public sealed class SavedSettings
 {
+    /// <summary>
+    /// Brings settings from a damaged or hand-edited file into the ranges the settings panel allows: 3 to 200
+    /// rows and columns, a bomb count that fits the board, a density of 1 to 50 percent, known generators, and a
+    /// window size that is a real size (otherwise it is forgotten).
+    /// </summary>
+    public void Sanitize()
+    {
+        Rows = Math.Clamp(Rows, 3, 200);
+        Columns = Math.Clamp(Columns, 3, 200);
+        if (!Enum.IsDefined(Generator))
+        {
+            Generator = GeneratorKind.NoGuessing;
+        }
+        if (!Enum.IsDefined(EndlessGenerator))
+        {
+            EndlessGenerator = GeneratorKind.NoGuessing;
+        }
+        int free = Generator == GeneratorKind.Classic ? 1 : 9;   // the generators keep the first click free
+        BombCount = Math.Clamp(BombCount, 1, Rows * Columns - free);
+        DensityPercent = Math.Clamp(DensityPercent, 1, 50);
+        bool Usable(double? size) => size is double s && double.IsFinite(s) && s > 0 && s < 100_000;
+        if (!Usable(WindowWidth) || !Usable(WindowHeight))
+        {
+            WindowWidth = null;
+            WindowHeight = null;
+        }
+    }
+
     /// <summary>
     /// The number of rows.
     /// </summary>
@@ -130,7 +170,7 @@ public sealed class SavedSettings
 }
 
 /// <summary>
-/// An unfinished board. Cells are <c>Field.Index</c> values (row * Columns + column).
+/// An unfinished finite game. Cells are <c>Field.Index</c> values (row * Columns + column).
 /// </summary>
 public sealed class SavedGame
 {
@@ -193,17 +233,20 @@ public sealed class SavedGame
     /// <returns>True if the saved game is usable.</returns>
     public bool IsValid()
     {
-        int cells = Rows * Columns;
-        bool OnBoard(int[] list) => list.All(i => i >= 0 && i < cells);
-        return Rows > 0 && Columns > 0 && cells <= 1_000_000 && Bombs.Length > 0
-            && OnBoard(Bombs) && OnBoard(Revealed) && OnBoard(Flagged) && OnBoard(Questioned)
-            && !Revealed.Intersect(Bombs).Any() && ElapsedSeconds >= 0;
+        long cells = (long)Rows * Columns;   // long: two large sizes would overflow an int
+        bool OnBoard(int[]? list) => list is not null && list.All(i => i >= 0 && i < cells);
+        return Rows > 0 && Columns > 0 && cells <= 1_000_000
+            && OnBoard(Bombs) && Bombs.Length > 0
+            && OnBoard(Revealed) && OnBoard(Flagged) && OnBoard(Questioned)
+            && !Revealed.Intersect(Bombs).Any() && double.IsFinite(ElapsedSeconds) && ElapsedSeconds >= 0;
     }
 
     /// <summary>
     /// Restores the board.
     /// </summary>
-    /// <returns>A board in the saved state: bombs placed, the revealed cells revealed and the flags set.</returns>
+    /// <returns>
+    /// A board in the saved state: bombs placed, the revealed cells revealed and the flags and question marks set.
+    /// </returns>
     public FieldMatrix ToBoard()
     {
         var bombs = new bool[Rows, Columns];
@@ -268,7 +311,9 @@ public sealed class SavedEndlessGame
     /// <returns>The board, or <c>null</c> if the saved data is damaged.</returns>
     public InfiniteFieldMatrix? ToBoard()
     {
-        if (DensityPercent < 0 || DensityPercent > 100 || ElapsedSeconds < 0 || Board is null)
+        if (DensityPercent < 1 || DensityPercent > 50 || !Enum.IsDefined(Generator)
+            || !double.IsFinite(ElapsedSeconds) || ElapsedSeconds < 0 || Board?.Chunks is null
+            || Board.Chunks.Any(chunk => chunk is null))
         {
             return null;
         }

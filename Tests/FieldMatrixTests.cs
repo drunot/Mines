@@ -1,23 +1,25 @@
 using System.Linq;
-using Mines;
 using Mines.Solving;
 
 namespace Mines.Tests;
 
-// FieldsLeft and BombsLeft are kept up to date by the fields as they change. These tests compare
-// them with a direct count of the cells, so bookkeeping bugs show up even when no deduction breaks.
+// FieldsLeft and BombsLeft are kept up to date by the fields as they change. Most of these tests compare
+// them with a direct count of the cells, so bookkeeping bugs show up even when no deduction breaks. Also
+// covered: marks (flag, question mark, none), revealing marked cells and the first click with
+// ClassicRandomGenerator.
 public class FieldMatrixTests
 {
     // Hidden cells without a flag.
     private static int CountUnknown(FieldMatrix matrix) => Boards.All(matrix).Count(f => f.Hidden && !f.Flagged);
 
-    // Bombs minus flags placed. Revealed bombs (a lost game) don't count.
+    // Bombs minus flags placed. Revealing a bomb (a lost game) doesn't change it.
     private static int CountBombsLeft(FieldMatrix matrix)
     {
         var fields = Boards.All(matrix).ToList();
         return fields.Count(f => f.IsBomb) - fields.Count(f => f.Flagged);
     }
 
+    // Fails with both values when FieldsLeft or BombsLeft differs from the direct count.
     private static void AssertCountersMatch(FieldMatrix matrix, string where)
     {
         Assert.True(CountUnknown(matrix) == matrix.FieldsLeft,
@@ -26,6 +28,7 @@ public class FieldMatrixTests
             $"BombsLeft is {matrix.BombsLeft}, counted {CountBombsLeft(matrix)} ({where})");
     }
 
+    // 4x5 board with two bombs in opposite corners: (0,0) and (3,4).
     private static FieldMatrix SmallBoard() => Boards.FromText(
         "*....",
         ".....",

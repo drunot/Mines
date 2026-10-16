@@ -1,13 +1,13 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using Mines;
 using Mines.Solving;
 
 namespace Mines.Tests;
 
 // The endless board: chunks around revealed cells, numbers across chunk borders, the cascade limited to the
-// visible area, and the streak counter.
+// active area around the visible cells, the streak counter (a chord counts one click per neighbour it opens),
+// saving and loading, marks, and the no-guess promise for the first chunk.
 public class InfiniteFieldMatrixTests
 {
     // All fields that exist in the square of cells from -size to size in both directions.
@@ -91,7 +91,8 @@ public class InfiniteFieldMatrixTests
         Assert.All(revealed, f => Assert.InRange(f.Position.Y, -15, 29));
         Assert.Equal(1, board.Streak);
 
-        board.SetVisibleArea(0, 15, 14, 29);   // one chunk to the right: one more column of chunks becomes active
+        // One chunk to the right: active chunks -1..1 by 0..2, so the cascade continues into columns 30..44.
+        board.SetVisibleArea(0, 15, 14, 29);
 
         Assert.Equal(45 * 60, FieldsAround(board, 200).Count(f => !f.Hidden));
         Assert.Equal(1, board.Streak);   // moving the view isn't a click
@@ -189,6 +190,61 @@ public class InfiniteFieldMatrixTests
         Assert.True(checkedBoards > 0, "no board with a suitable number was found");
     }
 
+    // Save and Load keep every cell (bomb, hidden, mark) and the counters, and the pending cascade continues.
+    // A chunk made without a reveal (here by marking a far away cell) is still arranged to be solvable by logic
+    // before its first cell is revealed.
+    [Fact]
+    public void Chunk_made_by_a_mark_is_arranged_before_its_first_reveal()
+    {
+        for (int seed = 0; seed < 10; seed++)
+        {
+            var board = new InfiniteFieldMatrix(0.15f, GeneratorType.Deterministic, new Random(seed));
+            board.SetVisibleArea(-30, -30, 330, 330);
+            board.Reveal(0, 0);
+            board.CycleMark(300, 300);   // creates the chunks around (300, 300) without revealing anything
+
+            // Reveal a safe cell in the middle of chunk (20, 20), as a player clicking there would.
+            Field cell = board.FieldAt(307, 307)!;
+            if (cell.IsBomb)
+            {
+                continue;   // a blind click on a bomb shows nothing to solve from
+            }
+            board.Reveal(307, 307);
+
+            FieldMatrix window = board.CreateWindow(20, 20, out _);
+            new ConstraintSolver { UseGlobalEquation = false, IgnoreEdges = true }.Solve(window);
+            for (int r = 15; r < 30; r++)
+            {
+                for (int c = 15; c < 30; c++)
+                {
+                    Assert.False(window[r, c].Hidden && !window[r, c].IsBomb,
+                        $"seed {seed}: cell ({r - 15},{c - 15}) of the marked chunk needs a guess");
+                }
+            }
+        }
+    }
+
+    // The board, its no-guess arranging included, only uses the random source it was given.
+    [Fact]
+    public void Same_seed_gives_the_same_board()
+    {
+        InfiniteBoardState Play(int seed)
+        {
+            var board = new InfiniteFieldMatrix(0.2f, GeneratorType.Deterministic, new Random(seed));
+            board.SetVisibleArea(-20, -20, 20, 20);
+            board.Reveal(0, 0);
+            board.Reveal(40, 40);
+            return board.Save();
+        }
+
+        for (int seed = 0; seed < 5; seed++)
+        {
+            InfiniteBoardState a = Play(seed), b = Play(seed);
+            Assert.Equal(a.Chunks.Select(c => (c.Row, c.Column, c.Cells)).OrderBy(c => (c.Row, c.Column)),
+                         b.Chunks.Select(c => (c.Row, c.Column, c.Cells)).OrderBy(c => (c.Row, c.Column)));
+        }
+    }
+
     [Fact]
     public void Saved_board_continues_where_it_was()
     {
@@ -217,13 +273,16 @@ public class InfiniteFieldMatrixTests
         // inside it has a hidden, unflagged neighbour inside it. (New chunks get new random bombs, so the two
         // boards can differ from here on.)
         loaded.SetVisibleArea(0, 15, 14, 29);   // active: chunks -1..1 by 0..2, cells -15..29 by 0..44
-        static bool Active(Field f) => f.Position.X >= -15 && f.Position.X <= 29 && f.Position.Y >= 0 && f.Position.Y <= 44;
-        foreach (Field f in FieldsAround(loaded, 60).Where(f => Active(f) && !f.Hidden && !f.IsBomb && f.Number is null))
+        static bool Active(Field f) =>
+            f.Position.X >= -15 && f.Position.X <= 29 && f.Position.Y >= 0 && f.Position.Y <= 44;
+        var openZeros = FieldsAround(loaded, 60).Where(f => Active(f) && !f.Hidden && !f.IsBomb && f.Number is null);
+        foreach (Field f in openZeros)
         {
             Assert.DoesNotContain(f.Neighbors, n => Active(n) && n.Hidden && !n.Flagged);
         }
     }
 
+    // A chunk whose cell string has the wrong length makes Load return null instead of a broken board.
     [Fact]
     public void Damaged_save_is_refused()
     {

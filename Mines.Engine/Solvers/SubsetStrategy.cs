@@ -1,8 +1,4 @@
-using System.Collections.Generic;
-using System.Linq;
-
 namespace Mines.Solving;
-
 
 /// <summary>
 /// Compares one equation with the equations that are subsets or supersets of it and adds their

@@ -33,9 +33,9 @@
       </local:BevelFrame>
       <!-- Sunken bevel frame (dark top and left, light bottom and right), mitred corner to corner. -->
       <local:BevelFrame Margin="5,0,5,5">
-        <!-- The board fills the scroll box with cells of 5 mm; the mouse wheel zooms, dragging or the scrollbars
-             pan (an endless board has no scrollbars). -->
-        <!-- SystemRegionBrush: the theme's normal window background (the window itself uses ClearBrush). -->
+        <!-- The board view fills the scroll box; cells start at 5 mm. The mouse wheel zooms, dragging or the
+             scrollbars pan (an endless board has no scrollbars and pans freely). -->
+        <!-- HiddenBrush, like the window: shows around a finite board that is smaller than the box. -->
         <ScrollViewer x:Name="BoardScroller" Background="{DynamicResource HiddenBrush}"
                       HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
           <local:BoardView x:Name="BoardView"/>

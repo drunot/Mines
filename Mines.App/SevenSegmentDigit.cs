@@ -99,7 +99,9 @@ public class SevenSegmentDigit : Control
     /// <param name="key">The resource key, e.g. <c>SegmentOnBrush</c>.</param>
     /// <returns>The brush, or magenta if the resource is missing.</returns>
     private IBrush Brush(string key) =>
-        this.TryFindResource(key, ActualThemeVariant, out object? value) && value is IBrush brush ? brush : Brushes.Magenta;
+        this.TryFindResource(key, ActualThemeVariant, out object? value) && value is IBrush brush
+            ? brush
+            : Brushes.Magenta;
 
     // ---- Segments: bit 0 = a (top), then b (upper right), c (lower right), d (bottom), e (lower left),
     //      f (upper left), g (middle) ----
@@ -149,7 +151,7 @@ public class SevenSegmentDigit : Control
     /// <summary>
     /// The segment shapes, in the order a-g, from the SVG. Parsed on first use.
     /// </summary>
-    private static Geometry[] Segments => _segments ??= new[]
+    private static Geometry[] Segments => s_segments ??= new[]
     {
         Geometry.Parse("m 49.459513,37.746533 -3.58066,6.202206 21.060214,21.060213 h 58.798993 l 21.06073,-21.060213 -3.58118,-6.202206 z"),
         Geometry.Parse("m 149.71592,48.70297 6.2022,3.58066 v 74.67348 L 142.54323,140.332 128.65519,126.44396 V 69.763184 Z"),
@@ -163,5 +165,5 @@ public class SevenSegmentDigit : Control
     /// <summary>
     /// Cache for <see cref="Segments"/>.
     /// </summary>
-    private static Geometry[]? _segments;
+    private static Geometry[]? s_segments;
 }

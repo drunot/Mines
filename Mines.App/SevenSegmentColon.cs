@@ -77,7 +77,9 @@ public class SevenSegmentColon : Control
     /// <param name="key">The resource key, e.g. <c>SegmentOnBrush</c>.</param>
     /// <returns>The brush, or magenta if the resource is missing.</returns>
     private IBrush Brush(string key) =>
-        this.TryFindResource(key, ActualThemeVariant, out object? value) && value is IBrush brush ? brush : Brushes.Magenta;
+        this.TryFindResource(key, ActualThemeVariant, out object? value) && value is IBrush brush
+            ? brush
+            : Brushes.Magenta;
 
     /// <summary>
     /// The width of the colon in the SVG's coordinates.

@@ -32,7 +32,7 @@ public interface IBoard
     /// <summary>Whether the game is won. An infinite board can't be won.</summary>
     bool GameWon { get; }
 
-    /// <summary>Raised when any field changes: revealed, flagged or marked.</summary>
+    /// <summary>Raised when fields change: revealed, flagged or marked.</summary>
     event EventHandler? FieldChanged;
 
     /// <summary>
@@ -48,7 +48,8 @@ public interface IBoard
 
     /// <summary>
     /// The player reveals a cell: the first click places the bombs, a cell without neighbouring bombs opens its
-    /// neighbours, and a revealed number whose bombs are all flagged chords (reveals its other neighbours).
+    /// neighbours, and a revealed number whose bombs are all flagged chords (reveals its other neighbours). On
+    /// an infinite board, bombs that were already revealed count as flagged for a chord.
     /// </summary>
     /// <param name="row">The global row.</param>
     /// <param name="column">The global column.</param>

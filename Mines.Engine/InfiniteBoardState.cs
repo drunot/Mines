@@ -42,6 +42,11 @@ public sealed class ChunkState
     public bool Verified { get; set; }
 
     /// <summary>
+    /// Whether the chunk has been the centre of a window, so it has been arranged to be solvable by logic.
+    /// </summary>
+    public bool CentreChecked { get; set; }
+
+    /// <summary>
     /// One letter per cell, row by row: <c>'a'</c> plus a sum of 1 for a bomb, 2 for revealed, 4 for a flag and
     /// 8 for a question mark (so <c>'a'</c> to <c>'p'</c>).
     /// </summary>
